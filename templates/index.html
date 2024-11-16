@@ -1,0 +1,152 @@
+{% extends "layout.html" %}
+{% block body %}
+<script>
+function sortTable(n) {
+  var table, rows, switching, i, x, y, shouldSwitch, dir, switchcount = 0;
+  table = document.getElementById("items-table");
+  switching = true;
+  // Set the sorting direction to ascending:
+  dir = "asc";
+  /* Make a loop that will continue until
+  no switching has been done: */
+  while (switching) {
+    // Start by saying: no switching is done:
+    switching = false;
+    rows = table.rows;
+    /* Loop through all table rows (except the
+    first, which contains table headers): */
+    for (i = 1; i < (rows.length - 1); i++) {
+      // Start by saying there should be no switching:
+      shouldSwitch = false;
+      /* Get the two elements you want to compare,
+      one from current row and one from the next: */
+      x = rows[i].getElementsByTagName("TD")[n];
+      y = rows[i + 1].getElementsByTagName("TD")[n];
+      /* Check if the two rows should switch place,
+      based on the direction, asc or desc: */
+      if (dir === "asc") {
+        if (x.innerHTML.toLowerCase() > y.innerHTML.toLowerCase()) {
+          // If so, mark as a switch and break the loop:
+          shouldSwitch = true;
+          break;
+        }
+      } else if (dir === "desc") {
+        if (x.innerHTML.toLowerCase() < y.innerHTML.toLowerCase()) {
+          // If so, mark as a switch and break the loop:
+          shouldSwitch = true;
+          break;
+        }
+      }
+    }
+    if (shouldSwitch) {
+      /* If a switch has been marked, make the switch
+      and mark that a switch has been done: */
+      rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
+      switching = true;
+      // Each time a switch is done, increase this count by 1:
+      switchcount ++;
+    } else {
+      /* If no switching has been done AND the direction is "asc",
+      set the direction to "desc" and run the while loop again. */
+      if (switchcount === 0 && dir === "asc") {
+        dir = "desc";
+        switching = true;
+      }
+    }
+  }
+}
+
+function filterTable() {
+    var select = document.getElementById("tag");
+    var filter = Array.from(select.selectedOptions).map(option => option.value.toLowerCase());
+    var rows = document.getElementById("items-table").getElementsByTagName("tbody")[0].getElementsByTagName("tr");
+
+    for (var i = 0; i < rows.length; i++) {
+        var cells = rows[i].getElementsByTagName("td");
+        if (cells.length > 5) {
+            var tags = cells[5].innerText.toLowerCase().split('\n').map(tag => tag.trim()).filter(tag => tag !== "");
+            if (filter.length === 0 || filter.some(f => tags.includes(f))) {
+                rows[i].style.display = "";
+            } else {
+                rows[i].style.display = "none";
+            }
+        }
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const select = document.getElementById("tag");
+    select.addEventListener('change', filterTable);
+    filterTable();
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+    const today = new Date('{{ today.strftime("%Y-%m-%d") }}');
+    const rows = document.querySelectorAll('#items-table tr');
+
+    rows.forEach(row => {
+        const expiryDateCell = row.cells[2]; // Assuming the expiry date is in the third column
+        if (expiryDateCell) {
+            const expiryDateText = expiryDateCell.textContent.split(' ').pop(); // Extract the date part
+            const expiryDate = new Date(expiryDateText);
+
+            if (expiryDate < today) {
+                row.style.textDecoration = 'line-through';
+            }
+        }
+    });
+});
+</script>
+    <h1>Index</h1>
+    <p>Welcome to Pyntry!</p>
+    {% if current_user.is_authenticated %}
+        <p>Logged in as {{ current_user.username }}.</p>
+        <p><a href="{{ url_for('logout') }}">Logout</a></p>
+        <p><a href="{{ url_for('register') }}">Register a new user</a></p>
+        <br>
+    {% else %}
+        <p><a href="{{ url_for('login') }}">Login</a></p>
+    {% endif %}
+    <h2>Items</h2>
+<form id="filterForm">
+    <label for="tag">Filter by tag:</label>
+    <select name="tag" id="tag" multiple>
+        {% for tag in tags %}
+            <option value="{{ tag }}">{{ tag }}</option>
+        {% endfor %}
+    </select>
+</form>
+    <table id="items-table">
+        <tr>
+            <th onclick="sortTable(0)">Quantity</th>
+            <th onclick="sortTable(1)">Name</th>
+            <th onclick="sortTable(2)">Expiry</th>
+            <th onclick="sortTable(3)">Image</th>
+            <th style="display: none;">Tags</th>
+            <th>Quick Actions</th>
+        </tr>
+        {% for item in items %}
+        <tr>
+            <td>{{ item.quantity }}</td>
+            {% if current_user.is_authenticated %}
+            <td><a href="{{ url_for('edit', id=item.id) }}">{{ item.name }}</a></td>
+            {% else %}
+            <td>{{ item.name }}</td>
+            {% endif %}
+            <td>{{ item.expire_type }} {{ item.expiry_date }}</td>
+            <td>{% if item.image_url %}<img height=64px src="{{ item.image_url }}" alt="{{ item.name }}" >{% endif %}</td>
+            {% if current_user.is_authenticated %}
+            <td><a href="{{ url_for('edit', id=item.id) }}">Edit</a></td>
+            {% endif %}
+            <td style="display: none">
+                {% for tag in item.tags %}
+                    <span>{{ tag }}</span>
+                {% endfor %}
+            </td>
+        </tr>
+{% endfor %}
+    </table>
+    {% if current_user.is_authenticated %}
+        <p><a href="{{ url_for('add_item') }}">Add a new item</a></p>
+    {% endif %}
+{% endblock %}

@@ -1,0 +1,17 @@
+{% extends "layout.html" %}
+{% block body %}
+<h1>Edit Item</h1>
+{% if error %}
+  <p class=error><strong>Error:</strong> {{ error }}
+{% endif %}
+<form method="post" action="{{ url_for('edit', id=id) }}" enctype="multipart/form-data">
+        {{ form.csrf_token }}
+    {{ form.hidden_tag() }}
+        <p>{{ form.barcode.label }} {{ form.barcode() }}</p>
+        <p>{{ form.name.label }} {{ form.name() }}</p>
+        <p>{{ form.quantity.label }} {{ form.quantity() }}</p>
+        <p>{{ form.expire_type.label }} {{ form.expire_type() }}</p>
+        <p>{{ form.expiry_date.label }} {{ form.expiry_date() }}</p>
+        <p><input type="submit" value="Submit"></p>
+    </form>
+{% endblock %}

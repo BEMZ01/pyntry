@@ -1,0 +1,140 @@
+{% extends "layout.html" %}
+{% block body %}
+    <h1>Insert Item</h1>
+<script src="https://cdn.jsdelivr.net/npm/@undecaf/zbar-wasm@0.9.15/dist/index.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@undecaf/barcode-detector-polyfill@0.9.21/dist/index.js"></script>
+
+    <script>
+        async function initBarcodeScanner() {
+            try {
+                window['BarcodeDetector'].getSupportedFormats();
+            } catch {
+                window['BarcodeDetector'] = barcodeDetectorPolyfill.BarcodeDetectorPolyfill;
+            }
+
+            const video = document.querySelector('video');
+            try {
+                video.srcObject = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode: 'environment',
+                        width: { ideal: 640 },
+                        height: { ideal: 480 }
+                    }
+                });
+            } catch (err) {
+                console.error("Error accessing the camera: ", err);
+                alert("Error accessing the camera. Please check your permissions.");
+                return;
+            }
+
+            const barcodeDetector = new BarcodeDetector({ formats: ["ean_13", "ean_8", "upc_a", "upc_e"] });
+
+            async function detectBarcode() {
+                try {
+                    let barcodes = await barcodeDetector.detect(video);
+
+                    if (barcodes.length > 0) {
+                        const barcodeValue = barcodes[0].rawValue;
+                        document.getElementById("scanner-info").innerText = `Detected barcode: ${barcodeValue}`;
+                        document.getElementById("barcode").value = barcodeValue;
+                        navigator.vibrate(200);
+                        handleBarcodeChange(barcodeValue);
+                    } else {
+                        requestAnimationFrame(detectBarcode);
+                    }
+                } catch {
+                    requestAnimationFrame(detectBarcode);
+                }
+            }
+
+            requestAnimationFrame(detectBarcode);
+        }
+
+        function handleBarcodeChange(barcode) {
+            fetch(`{{ url_for('api_item', barcode='') }}${barcode}`)
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById("video").style.display = 'none';
+                    if (data.image_front_small || data.image_url) {
+                        let img = document.createElement('img');
+                        if (data.image_url) {
+                            document.getElementById("scanner-info").innerText += '\n - Already in database!';
+                            document.getElementById("scanner-info").innerHTML += `<br><a href="{{ url_for('edit', id='') }}${data.id}">Edit item</a>`;
+                            img.src = data.image_url;
+                        }
+                        else {
+                            document.getElementById("scanner-info").innerText += '\n - Not in database!';
+                            img.src = data.image_front_small;
+                        }
+                        img.alt = "Suggested item image";
+                        document.querySelector('.video_show').appendChild(img);
+                    }
+                    if (data.name) {
+                        document.querySelector('input[name="name"]').value = data.name;
+                        let text = document.createElement('p');
+                        text.innerHTML = data.name;
+                        document.querySelector('.video_show').appendChild(text);
+                    }
+                    if (data.quantity) {
+                        document.querySelector('input[name="quantity"]').value = data.quantity;
+                        let text = document.createElement('p');
+                        text.innerHTML = data.quantity;
+                        document.querySelector('.video_show').appendChild(text);
+                    }
+                    if (data.expiry_date) {
+                        document.querySelector('input[name="expiry_date"]').value = data.expiry_date;
+                        let text = document.createElement('p');
+                        text.innerHTML = data.expiry_date;
+                        document.querySelector('.video_show').appendChild(text);
+                    }
+                    if (data.expire_type) {
+                        document.querySelector('select[name="expire_type"]').value = data.expire_type;
+                        let text = document.createElement('p');
+                        text.innerHTML = data.expire_type;
+                        document.querySelector('.video_show').appendChild(text);
+                    }
+
+                })
+                .catch(error => console.error('Error fetching item data:', error));
+        }
+
+        function reactivateScanner() {
+            document.getElementById("video").style.display = 'block';
+            initBarcodeScanner();
+        }
+
+        window.onload = initBarcodeScanner;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const barcodeInput = document.querySelector('input[name="barcode"]');
+            barcodeInput.addEventListener('blur', (event) => {
+                if (event.target.value === '') {
+                    reactivateScanner();
+                } else {
+                    handleBarcodeChange(event.target.value);
+                }
+            });
+
+            document.getElementById('reactivate-scanner').addEventListener('click', reactivateScanner);
+        });
+    </script>
+  {% if error %}
+    <p class=error><strong>Error:</strong> {{ error }}
+  {% endif %}
+<div class="video_show">
+    <video autoplay id="video" playsinline></video>
+</div>
+    <form method="post" action="{{ url_for('add_item') }}" enctype="multipart/form-data">
+        {{ form.csrf_token }}
+        <p id="scanner-info">Scanner information will be shown here</p>
+        <p>{{ form.barcode.label }} {{ form.barcode() }}<button id="reactivate-scanner">Reactivate Scanner</button></p>
+        <p>{{ form.name.label }} {{ form.name() }}</p>
+        <p>{{ form.quantity.label }} {{ form.quantity() }}</p>
+        <p>{{ form.expire_type.label }} {{ form.expire_type() }}</p>
+        <p>{{ form.expiry_date.label }} {{ form.expiry_date() }}</p>
+        <p><input type="submit" value="Submit"></p>
+    </form>
+
+    <p><a href="{{ url_for('index') }}">Back to index</a></p>
+
+{% endblock %}

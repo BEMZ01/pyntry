@@ -1,0 +1,14 @@
+{% extends "layout.html" %}
+{% block body %}
+    <h1>Register</h1>
+  {% if error %}
+    <p class=error><strong>Error:</strong> {{ error }}
+  {% endif %}
+    <form method="post" action="{{ url_for('register') }}" enctype="multipart/form-data">
+        {{ form.csrf_token }}
+        <p>{{ form.username.label }} {{ form.username() }}</p>
+        <p>{{ form.password.label }} {{ form.password() }}</p>
+        <p>{{ form.password_confirm.label }} {{ form.password_confirm() }}</p>
+        <p><input type="submit" value="Submit"></p>
+    </form>
+{% endblock %}
