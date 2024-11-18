@@ -1,13 +1,9 @@
-from array import array
-from ftplib import all_errors
-
 VERSION = 0.1
 import json
 import os
 import re
 import time
 from pprint import pprint
-from traceback import format_exc
 from flask import Flask, render_template, request, redirect, url_for, session, flash, abort
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from flask_wtf import FlaskForm
@@ -148,7 +144,6 @@ def get_product_info_from_api(barcode, format=False):
     if not format:
         return json.loads(response.text)['product']
     else:
-        pprint(json.loads(response.text)['product'])
         d = {}
         if 'categories' in json.loads(response.text)['product']:
             d['tags'] = json.loads(response.text)['product']['categories']
@@ -210,7 +205,6 @@ def get_items():
 @app.route('/')
 def index():
     items = get_items()
-    pprint(items)
     return render_template('index.html', items=items, today=datetime.now(), tags=get_all_tags())
 
 
@@ -352,7 +346,6 @@ def edit(id):
         barcode = form.barcode.data
         expiry_date = form.expiry_date.data
         expire_type = form.expire_type.data
-        print(name, quantity, barcode, expiry_date, expire_type)
         with sql.connect(os.getenv("DB_PATH")) as conn:
             c = conn.cursor()
             c.execute('UPDATE items SET name = ?, quantity = ?, barcode = ?, expiry_date = ?, expire_type = ? '
@@ -372,4 +365,4 @@ def delete(id):
     flash('Item deleted successfully.', 'success')
     return redirect(url_for('index'))
 
-app.run(debug=True, host='0.0.0.0', port=5000)
+app.run(debug=True)
