@@ -12,7 +12,6 @@ from wtforms import StringField, PasswordField, BooleanField, DecimalField, Radi
 from wtforms.fields.datetime import DateField
 from wtforms.fields.numeric import IntegerRangeField, IntegerField
 from wtforms.validators import InputRequired
-import aiosqlite as sqlite3
 import sqlite3 as sql
 from dotenv import load_dotenv
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -171,6 +170,9 @@ def get_all_tags():
             all_tags.extend([tag.strip() for tag in tag_list])
     all_tags = sorted(list(set(all_tags)))  # Remove duplicates
     return all_tags
+
+if os.getenv("DB_PATH") is None or os.getenv("DB_PATH") == "":
+    raise ValueError("DB_PATH not found in .env file. Have you copied the .env.example file to .env?")
 
 if os.path.exists(os.getenv("DB_PATH")):
     conn = sql.connect(os.getenv("DB_PATH"))
