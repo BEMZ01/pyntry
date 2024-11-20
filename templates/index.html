@@ -2,58 +2,40 @@
 {% block body %}
 <script>
 function sortTable(n) {
-  var table, rows, switching, i, x, y, shouldSwitch, dir, switchcount = 0;
-  table = document.getElementById("items-table");
-  switching = true;
-  // Set the sorting direction to ascending:
-  dir = "asc";
-  /* Make a loop that will continue until
-  no switching has been done: */
-  while (switching) {
-    // Start by saying: no switching is done:
-    switching = false;
-    rows = table.rows;
-    /* Loop through all table rows (except the
-    first, which contains table headers): */
-    for (i = 1; i < (rows.length - 1); i++) {
-      // Start by saying there should be no switching:
-      shouldSwitch = false;
-      /* Get the two elements you want to compare,
-      one from current row and one from the next: */
-      x = rows[i].getElementsByTagName("TD")[n];
-      y = rows[i + 1].getElementsByTagName("TD")[n];
-      /* Check if the two rows should switch place,
-      based on the direction, asc or desc: */
-      if (dir === "asc") {
-        if (x.innerHTML.toLowerCase() > y.innerHTML.toLowerCase()) {
-          // If so, mark as a switch and break the loop:
-          shouldSwitch = true;
-          break;
+    var table, rows, switching, i, x, y, shouldSwitch, dir, switchcount = 0;
+    table = document.getElementById("items-table");
+    switching = true;
+    dir = "asc";
+    while (switching) {
+        switching = false;
+        rows = table.rows;
+        for (i = 1; i < (rows.length - 1); i++) {
+            shouldSwitch = false;
+            x = rows[i].getElementsByTagName("TD")[n];
+            y = rows[i + 1].getElementsByTagName("TD")[n];
+            if (dir === "asc") {
+                if (x.innerHTML.toLowerCase() > y.innerHTML.toLowerCase()) {
+                    shouldSwitch = true;
+                    break;
+                }
+            } else if (dir === "desc") {
+                if (x.innerHTML.toLowerCase() < y.innerHTML.toLowerCase()) {
+                    shouldSwitch = true;
+                    break;
+                }
+            }
         }
-      } else if (dir === "desc") {
-        if (x.innerHTML.toLowerCase() < y.innerHTML.toLowerCase()) {
-          // If so, mark as a switch and break the loop:
-          shouldSwitch = true;
-          break;
+        if (shouldSwitch) {
+            rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
+            switching = true;
+            switchcount++;
+        } else {
+            if (switchcount === 0 && dir === "asc") {
+                dir = "desc";
+                switching = true;
+            }
         }
-      }
     }
-    if (shouldSwitch) {
-      /* If a switch has been marked, make the switch
-      and mark that a switch has been done: */
-      rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
-      switching = true;
-      // Each time a switch is done, increase this count by 1:
-      switchcount ++;
-    } else {
-      /* If no switching has been done AND the direction is "asc",
-      set the direction to "desc" and run the while loop again. */
-      if (switchcount === 0 && dir === "asc") {
-        dir = "desc";
-        switching = true;
-      }
-    }
-  }
 }
 
 function filterTable() {
@@ -85,9 +67,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const rows = document.querySelectorAll('#items-table tr');
 
     rows.forEach(row => {
-        const expiryDateCell = row.cells[2]; // Assuming the expiry date is in the third column
+        const expiryDateCell = row.cells[2];
         if (expiryDateCell) {
-            const expiryDateText = expiryDateCell.textContent.split(' ').pop(); // Extract the date part
+            const expiryDateText = expiryDateCell.textContent.split(' ').pop();
             const expiryDate = new Date(expiryDateText);
 
             if (expiryDate < today) {
@@ -97,56 +79,60 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 </script>
-    <h1>Index</h1>
-    <p>Welcome to Pyntry!</p>
+<div class="container mx-auto p-4">
+    <h1 class="text-3xl font-bold mb-4 text-center">Index</h1>
+    <p class="mb-4 text-center">Welcome to Pyntry!</p>
     {% if current_user.is_authenticated %}
-        <p>Logged in as {{ current_user.username }}.</p>
-        <p><a href="{{ url_for('logout') }}">Logout</a></p>
-        <p><a href="{{ url_for('register') }}">Register a new user</a></p>
+        <p class="mb-2 text-center">Logged in as {{ current_user.username }}.</p>
+        <p class="mb-2 text-center"><a href="{{ url_for('logout') }}" class="text-blue-500 hover:underline">Logout</a></p>
+        <p class="mb-2 text-center"><a href="{{ url_for('register') }}" class="text-blue-500 hover:underline">Register a new user</a></p>
         <br>
     {% else %}
-        <p><a href="{{ url_for('login') }}">Login</a></p>
+        <p class="mb-2 text-center"><a href="{{ url_for('login') }}" class="text-blue-500 hover:underline">Login</a></p>
     {% endif %}
-    <h2>Items</h2>
-<form id="filterForm">
-    <label for="tag">Filter by tag:</label>
-    <select name="tag" id="tag" multiple>
-        {% for tag in tags %}
-            <option value="{{ tag }}">{{ tag }}</option>
-        {% endfor %}
-    </select>
-</form>
-    <table id="items-table">
-        <tr>
-            <th onclick="sortTable(0)">Quantity</th>
-            <th onclick="sortTable(1)">Name</th>
-            <th onclick="sortTable(2)">Expiry</th>
-            <th onclick="sortTable(3)">Image</th>
-            <th style="display: none;">Tags</th>
-            <th>Quick Actions</th>
-        </tr>
+    <h2 class="text-2xl font-semibold mb-4 text-center">Items</h2>
+    <form id="filterForm" class="mb-4 text-center">
+        <label for="tag" class="block mb-2">Filter by tag:</label>
+        <select name="tag" id="tag" multiple class="block w-full p-2 border border-gray-300 rounded">
+            {% for tag in tags %}
+                <option value="{{ tag }}">{{ tag }}</option>
+            {% endfor %}
+        </select>
+    </form>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {% for item in items %}
-        <tr>
-            <td>{{ item.quantity }}</td>
+        <div class="bg-white shadow-md rounded-lg p-4">
+            <div class="flex justify-between items-center mb-2">
+                <span class="font-bold">{{ item.quantity }}</span>
+                {% if current_user.is_authenticated %}
+                <a href="{{ url_for('edit', id=item.id) }}" class="text-blue-500 hover:underline">{{ item.name }}</a>
+                {% else %}
+                <span>{{ item.name }}</span>
+                {% endif %}
+            </div>
+            <div class="mb-2">
+                <span>{{ item.expire_type }} {{ item.expiry_date }}</span>
+            </div>
+            <div class="mb-2">
+                {% if item.image_url %}
+                <img class="w-full h-32 object-cover" src="{{ item.image_url }}" alt="{{ item.name }}">
+                {% endif %}
+            </div>
             {% if current_user.is_authenticated %}
-            <td><a href="{{ url_for('edit', id=item.id) }}">{{ item.name }}</a></td>
-            {% else %}
-            <td>{{ item.name }}</td>
+            <div class="mb-2">
+                <a href="{{ url_for('edit', id=item.id) }}" class="text-blue-500 hover:underline">Edit</a>
+            </div>
             {% endif %}
-            <td>{{ item.expire_type }} {{ item.expiry_date }}</td>
-            <td>{% if item.image_url %}<img height=64px src="{{ item.image_url }}" alt="{{ item.name }}" >{% endif %}</td>
-            {% if current_user.is_authenticated %}
-            <td><a href="{{ url_for('edit', id=item.id) }}">Edit</a></td>
-            {% endif %}
-            <td style="display: none">
+            <div class="hidden">
                 {% for tag in item.tags %}
-                    <span>{{ tag }}</span>
+                <span>{{ tag }}</span>
                 {% endfor %}
-            </td>
-        </tr>
-{% endfor %}
-    </table>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
     {% if current_user.is_authenticated %}
-        <p><a href="{{ url_for('add_item') }}">Add a new item</a></p>
+    <p class="mt-4 text-center"><a href="{{ url_for('add_item') }}" class="text-blue-500 hover:underline">Add a new item</a></p>
     {% endif %}
+</div>
 {% endblock %}

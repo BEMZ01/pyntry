@@ -1,14 +1,29 @@
 {% extends "layout.html" %}
 {% block body %}
-  <h1>Login</h1>
-  {% if error %}
-    <p class=error><strong>Error:</strong> {{ error }}
-  {% endif %}
-    <form method="post" action="{{ url_for('login') }}" enctype="multipart/form-data">
+  <div class="min-h-screen flex items-center justify-center bg-gray-100">
+    <div class="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
+      <h1 class="text-2xl font-bold mb-6 text-center">Login</h1>
+      {% if error %}
+        <p class="bg-red-100 text-red-700 p-2 rounded mb-4"><strong>Error:</strong> {{ error }}</p>
+      {% endif %}
+      <form method="post" action="{{ url_for('login') }}" enctype="multipart/form-data" class="space-y-4">
         {{ form.csrf_token }}
-        <p>{{ form.username.label }} {{ form.username() }}</p>
-        <p>{{ form.password.label }} {{ form.password() }}</p>
-        <p>{{ form.persist() }} {{ form.persist.label }}</p>
-        <p><input type="submit" value="Submit"></p>
-    </form>
+        <div>
+          <label class="block text-gray-700">{{ form.username.label }}</label>
+          {{ form.username(class="w-full p-2 border border-gray-300 rounded") }}
+        </div>
+        <div>
+          <label class="block text-gray-700">{{ form.password.label }}</label>
+          {{ form.password(class="w-full p-2 border border-gray-300 rounded") }}
+        </div>
+        <div class="flex items-center">
+          {{ form.persist(class="mr-2") }}
+          <label class="text-gray-700">{{ form.persist.label }}</label>
+        </div>
+        <div>
+          <input type="submit" value="Submit" class="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600">
+        </div>
+      </form>
+    </div>
+  </div>
 {% endblock %}
