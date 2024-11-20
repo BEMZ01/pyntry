@@ -367,4 +367,4 @@ def delete(id):
     flash('Item deleted successfully.', 'success')
     return redirect(url_for('index'))
 
-app.run(debug=True)
+app.run(debug=os.getenv("FLASK_DEBUG", "False").lower() in ["true", "1"])
