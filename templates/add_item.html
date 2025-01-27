@@ -1,11 +1,9 @@
+
 {% extends "layout.html" %}
 {% block body %}
-    <div class="container mx-auto p-4">
-        <h1 class="text-2xl font-bold mb-4 text-center">Insert Item</h1>
-        <script src="https://cdn.jsdelivr.net/npm/@undecaf/zbar-wasm@0.9.15/dist/index.js"></script>
-        <script src="https://cdn.jsdelivr.net/npm/@undecaf/barcode-detector-polyfill@0.9.21/dist/index.js"></script>
-
-        <script>
+    <script src="https://cdn.jsdelivr.net/npm/@undecaf/zbar-wasm@0.11.0/dist/index.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@undecaf/barcode-detector-polyfill@0.9.21/dist/index.js"></script>
+    <script>
             async function initBarcodeScanner() {
                 try {
                     window['BarcodeDetector'].getSupportedFormats();
@@ -38,8 +36,8 @@
                             const barcodeValue = barcodes[0].rawValue;
                             document.getElementById("scanner-info").innerText = `Detected barcode: ${barcodeValue}`;
                             document.getElementById("barcode").value = barcodeValue;
-                            navigator.vibrate(200);
                             handleBarcodeChange(barcodeValue);
+                            navigator.vibrate(200);
                         } else {
                             requestAnimationFrame(detectBarcode);
                         }
@@ -52,55 +50,67 @@
             }
 
             function handleBarcodeChange(barcode) {
-                fetch(`{{ url_for('api_item', barcode='') }}${barcode}`)
-                    .then(response => response.json())
-                    .then(data => {
-                        document.getElementById("video").style.display = 'none';
-                        if (data.image_front_small || data.image_url) {
-                            let img = document.createElement('img');
-                            if (data.image_url) {
-                                document.getElementById("scanner-info").innerText += '\n - Already in database!';
-                                document.getElementById("scanner-info").innerHTML += `<br><a href="{{ url_for('edit', id='') }}${data.id}">Edit item</a>`;
-                                img.src = data.image_url;
-                            }
-                            else {
-                                document.getElementById("scanner-info").innerText += '\n - Not in database!';
-                                img.src = data.image_front_small;
-                            }
-                            img.alt = "Suggested item image";
-                            document.querySelector('.video_show').appendChild(img);
-                        }
-                        if (data.name) {
-                            document.querySelector('input[name="name"]').value = data.name;
-                            let text = document.createElement('p');
-                            text.innerHTML = data.name;
-                            document.querySelector('.video_show').appendChild(text);
-                        }
-                        if (data.quantity) {
-                            document.querySelector('input[name="quantity"]').value = data.quantity;
-                            let text = document.createElement('p');
-                            text.innerHTML = data.quantity;
-                            document.querySelector('.video_show').appendChild(text);
-                        }
-                        if (data.expiry_date) {
-                            document.querySelector('input[name="expiry_date"]').value = data.expiry_date;
-                            let text = document.createElement('p');
-                            text.innerHTML = data.expiry_date;
-                            document.querySelector('.video_show').appendChild(text);
-                        }
-                        if (data.expire_type) {
-                            document.querySelector('select[name="expire_type"]').value = data.expire_type;
-                            let text = document.createElement('p');
-                            text.innerHTML = data.expire_type;
-                            document.querySelector('.video_show').appendChild(text);
-                        }
-
-                    })
-                    .catch(error => console.error('Error fetching item data:', error));
+    fetch(`{{ url_for('api_item', barcode='') }}${barcode}`)
+        .then(response => response.json())
+        .then(data => {
+            const video = document.getElementById("video");
+            video.style.display = 'none';
+            const stream = video.srcObject;
+            if (stream) {
+                const tracks = stream.getTracks();
+                tracks.forEach(track => {
+                    track.stop();
+                });
+                video.srcObject = null;
+            } else {
+                console.warn('No stream to stop');
             }
+
+            if (data.image_front_small || data.image_url) {
+                let img = document.createElement('img');
+                if (data.image_url) {
+                    document.getElementById("scanner-info").innerText += '\n - Already in database!';
+                    document.getElementById("scanner-info").innerHTML += `<br><a href="{{ url_for('edit', id='') }}${data.id}">Edit item</a>`;
+                    img.src = data.image_url;
+                } else {
+                    document.getElementById("scanner-info").innerText += '\n - Not in database!';
+                    img.src = data.image_front_small;
+                }
+                img.alt = "Suggested item image";
+                document.querySelector('.video_show').appendChild(img);
+            }
+            if (data.name) {
+                document.querySelector('input[name="name"]').value = data.name;
+                let text = document.createElement('p');
+                text.innerHTML = data.name;
+                document.querySelector('.video_show').appendChild(text);
+            }
+            if (data.quantity) {
+                document.querySelector('input[name="quantity"]').value = data.quantity;
+                let text = document.createElement('p');
+                text.innerHTML = data.quantity;
+                document.querySelector('.video_show').appendChild(text);
+            }
+            if (data.expiry_date) {
+                document.querySelector('input[name="expiry_date"]').value = data.expiry_date;
+                let text = document.createElement('p');
+                text.innerHTML = data.expiry_date;
+                document.querySelector('.video_show').appendChild(text);
+            }
+            if (data.expire_type) {
+                document.querySelector('select[name="expire_type"]').value = data.expire_type;
+                let text = document.createElement('p');
+                text.innerHTML = data.expire_type;
+                document.querySelector('.video_show').appendChild(text);
+            }
+
+        })
+        .catch(error => console.error('Error fetching item data:', error));
+}
 
             function reactivateScanner() {
                 document.getElementById("video").style.display = 'block';
+                document.querySelector('.video_show').innerHTML = '<video id="video" preload="auto" autoplay="" loop="" height="100%" width="100%"></video>';
                 initBarcodeScanner();
             }
 
@@ -119,42 +129,43 @@
                 document.getElementById('reactivate-scanner').addEventListener('click', reactivateScanner);
             });
         </script>
-        {% if error %}
-            <p class="text-red-500 text-center"><strong>Error:</strong> {{ error }}</p>
-        {% endif %}
-        <div class="video_show mb-4 flex justify-center"></div>
-        <div class="flex justify-center">
-            <video autoplay id="video" playsinline class="w-1/2 h-auto"></video>
-        </div>
-        <form method="post" action="{{ url_for('add_item') }}" enctype="multipart/form-data" class="space-y-4 max-w-lg mx-auto">
-            {{ form.csrf_token }}
-            <p id="scanner-info" class="text-gray-700 text-center">Scanner information will be shown here</p>
-            <div class="flex items-center space-x-2">
-                <label for="barcode" class="block text-sm font-medium text-gray-700">{{ form.barcode.label }}</label>
-                {{ form.barcode(class="form-input mt-1 block w-full") }}
-                <button id="reactivate-scanner" type="button" class="ml-2 px-4 py-2 bg-blue-500 text-white rounded">Reactivate Scanner</button>
+    <div id="wrapper">
+        <div class="d-flex flex-column" id="content-wrapper">
+            <div id="content">
+                <div class="container-fluid">
+                    <h3 class="text-dark mb-4">Add Item</h3>
+                    <div class="card shadow">
+                        <div class="card-header py-3">
+                            <p class="text-primary m-0 fw-bold">Scanner</p>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col video_show"><video id="video" preload="auto" autoplay="" loop="" height="100%" width="100%"></video></div>
+                                <div class="col">
+                                    <p id="scanner-info">Scanner info...</p>
+                                    <button id="reactivate-scanner" class="btn btn-secondary" type="button">Reactivate Scanner</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card shadow">
+                        <div class="card-header py-3">
+                            <p class="text-primary m-0 fw-bold">Item Details</p>
+                        </div>
+                        <div class="card-body">
+                            <form method="post" action="{{ url_for('add_item') }}" enctype="multipart/form-data">
+                                {{ form.csrf_token }}
+                                {{ form.barcode.label }} {{ form.barcode(class="form-control") }}
+                                {{ form.name.label }} {{ form.name(class="form-control") }}
+                                {{ form.quantity.label }} {{ form.quantity(class="form-control") }}
+                                {{ form.expire_type.label }} {{ form.expire_type(class="form-control") }}
+                                {{ form.expiry_date.label }} {{ form.expiry_date(class="form-control") }}
+                                <button class="btn btn-primary" type="button">Submit</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div>
-                <label for="name" class="block text-sm font-medium text-gray-700">{{ form.name.label }}</label>
-                {{ form.name(class="form-input mt-1 block w-full") }}
-            </div>
-            <div>
-                <label for="quantity" class="block text-sm font-medium text-gray-700">{{ form.quantity.label }}</label>
-                {{ form.quantity(class="form-input mt-1 block w-full") }}
-            </div>
-            <div>
-                <label for="expire_type" class="block text-sm font-medium text-gray-700">{{ form.expire_type.label }}</label>
-                {{ form.expire_type(class="form-select mt-1 block w-full") }}
-            </div>
-            <div>
-                <label for="expiry_date" class="block text-sm font-medium text-gray-700">{{ form.expiry_date.label }}</label>
-                {{ form.expiry_date(class="form-input mt-1 block w-full") }}
-            </div>
-            <div>
-                <input type="submit" value="Submit" class="px-4 py-2 bg-green-500 text-white rounded">
-            </div>
-        </form>
-
-        <p class="mt-4 text-center"><a href="{{ url_for('index') }}" class="text-blue-500">Back to index</a></p>
+        </div><a class="border rounded d-inline scroll-to-top" href="#page-top"><i class="fas fa-angle-up"></i></a>
     </div>
 {% endblock %}

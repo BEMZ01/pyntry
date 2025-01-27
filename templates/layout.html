@@ -1,19 +1,52 @@
-<!doctype html>
-<html>
+<!DOCTYPE html>
+<html data-bs-theme="light" lang="en">
+
 <head>
-  <title>Pyntry</title>
-  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, shrink-to-fit=no">
+    <title>Pyntry</title>
+    <style>
+        #notification {
+  opacity: 1;
+  transition: opacity 2s ease-out;
+}
+
+#notification.hidden {
+  opacity: 0;
+}
+    </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename="/assets/bootstrap/css/bootstrap.min.css")}}">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Nunito:200,200i,300,300i,400,400i,600,600i,700,700i,800,800i,900,900i&amp;display=swap">
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.12.0/css/all.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename="/assets/css/Multiple-Input-Select-Pills.css")}}">
 </head>
 <body>
-  {% with messages = get_flashed_messages() %}
-    {% if messages %}
-      <ul class="flashes"></ul>
-      {% for message in messages %}
-        <li class="text-red-500">{{ message }}</li>
-      {% endfor %}
-      </ul>
-    {% endif %}
-  {% endwith %}
+  <div id="page-top"></div>
+  <div id="notification" class="hidden fixed top-4 right-4 bg-green-500 text-white p-4 rounded shadow-lg" style="height: 0"></div>
+
+
   {% block body %}{% endblock %}
+
+<script>
+  function showNotification(message) {
+    const notification = document.getElementById('notification');
+    notification.textContent = message;
+    notification.classList.remove('hidden');
+    setTimeout(() => {
+      notification.classList.add('hidden');
+    }, 2000); // Show for 2 seconds before starting to fade out
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const messages = {{ get_flashed_messages()|tojson }};
+    if (messages.length > 0) {
+      showNotification(messages[0]);
+    }
+  });
+</script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="{{ url_for('static', filename="/assets/js/bs-init.js")}}"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+  <script src="{{ url_for('static', filename="/assets/js/theme.js")}}"></script>
 </body>
-</html>

@@ -1,6 +1,6 @@
 {% extends "layout.html" %}
 {% block body %}
-<script>
+    <script>
 function sortTable(n) {
     var table, rows, switching, i, x, y, shouldSwitch, dir, switchcount = 0;
     table = document.getElementById("items-table");
@@ -79,60 +79,156 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 </script>
-<div class="container mx-auto p-4">
-    <h1 class="text-3xl font-bold mb-4 text-center">Index</h1>
-    <p class="mb-4 text-center">Welcome to Pyntry!</p>
-    {% if current_user.is_authenticated %}
-        <p class="mb-2 text-center">Logged in as {{ current_user.username }}.</p>
-        <p class="mb-2 text-center"><a href="{{ url_for('logout') }}" class="text-blue-500 hover:underline">Logout</a></p>
-        <p class="mb-2 text-center"><a href="{{ url_for('register') }}" class="text-blue-500 hover:underline">Register a new user</a></p>
-        <br>
-    {% else %}
-        <p class="mb-2 text-center"><a href="{{ url_for('login') }}" class="text-blue-500 hover:underline">Login</a></p>
-    {% endif %}
-    <h2 class="text-2xl font-semibold mb-4 text-center">Items</h2>
-    <form id="filterForm" class="mb-4 text-center">
-        <label for="tag" class="block mb-2">Filter by tag:</label>
-        <select name="tag" id="tag" multiple class="block w-full p-2 border border-gray-300 rounded">
-            {% for tag in tags %}
-                <option value="{{ tag }}">{{ tag }}</option>
-            {% endfor %}
-        </select>
-    </form>
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {% for item in items %}
-        <div class="bg-white shadow-md rounded-lg p-4">
-            <div class="flex justify-between items-center mb-2">
-                <span class="font-bold">{{ item.quantity }}</span>
-                {% if current_user.is_authenticated %}
-                <a href="{{ url_for('edit', id=item.id) }}" class="text-blue-500 hover:underline">{{ item.name }}</a>
-                {% else %}
-                <span>{{ item.name }}</span>
-                {% endif %}
-            </div>
-            <div class="mb-2">
-                <span>{{ item.expire_type }} {{ item.expiry_date }}</span>
-            </div>
-            <div class="mb-2">
-                {% if item.image_url %}
-                <img class="w-full h-32 object-cover" src="{{ item.image_url }}" alt="{{ item.name }}">
-                {% endif %}
-            </div>
-            {% if current_user.is_authenticated %}
-            <div class="mb-2">
-                <a href="{{ url_for('edit', id=item.id) }}" class="text-blue-500 hover:underline">Edit</a>
-            </div>
-            {% endif %}
-            <div class="hidden">
-                {% for tag in item.tags %}
-                <span>{{ tag }}</span>
-                {% endfor %}
-            </div>
-        </div>
-        {% endfor %}
+    <div id="wrapper">
+        <div class="d-flex flex-column" id="content-wrapper">
+            <div id="content">
+                <div class="container-fluid">
+                    <div class="d-sm-flex justify-content-between align-items-center mb-4">
+                        <h3 class="text-dark mb-0">Pyntry</h3>
+                        {% if current_user.is_authenticated %}
+                            <p class="mb-2 text-center">Logged in as {{ current_user.username }}.</p>
+                            <p class="mb-2 text-center"><a href="{{ url_for('logout') }}" class="text-blue-500 hover:underline">Logout</a></p>
+                            <p class="mb-2 text-center"><a href="{{ url_for('register') }}" class="text-blue-500 hover:underline">Register a new user</a></p>
+                        {% else %}
+                        <p class="mb-2 text-center"><a href="{{ url_for('login') }}" class="text-blue-500 hover:underline">Login</a></p>
+                        {% endif %}
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 col-xl-3 mb-4"><a href="">
+                                <div class="card shadow border-left-primary py-2" data-aos="fade" data-aos-once="true">
+                                    <div class="card-body">
+                                        <div class="row g-0 align-items-center">
+                                            <div class="col me-2">
+                                                <div class="text-uppercase text-primary fw-bold text-xs mb-1"><span>Best Before</span></div>
+                                                <div class="text-dark fw-bold h5 mb-0"><span>{{ c_bb }}</span></div>
+                                            </div>
+                                            <div class="col-auto"><i class="fas fa-calendar-alt fa-2x text-gray-300"></i></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </a></div>
+                        <div class="col-md-6 col-xl-3 mb-4"><a href="#">
+                                <div class="card shadow border-left-success py-2" data-aos="fade" data-aos-delay="50" data-aos-once="true">
+                                    <div class="card-body">
+                                        <div class="row g-0 align-items-center">
+                                            <div class="col me-2">
+                                                <div class="text-uppercase text-success fw-bold text-xs mb-1"><span>Use by</span></div>
+                                                <div class="text-dark fw-bold h5 mb-0"><span>{{ c_ub }}</span></div>
+                                            </div>
+                                            <div class="col-auto"><i class="fas fa-shopping-bag fa-2x text-gray-300"></i></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </a></div>
+                        <div class="col-md-6 col-xl-3 mb-4"><a href="#">
+                                <div class="card shadow border-left-info py-2" data-aos="fade" data-aos-delay="100" data-aos-once="true">
+                                    <div class="card-body">
+                                        <div class="row g-0 align-items-center">
+                                            <div class="col me-2">
+                                                <div class="text-uppercase text-success fw-bold text-xs mb-1"><span><span style="color: rgb(54, 185, 204);">Sell By</span></span></div>
+                                                <div class="text-dark fw-bold h5 mb-0"><span>{{ c_sb }}</span></div>
+                                            </div>
+                                            <div class="col-auto"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -32 576 576" width="1em" height="1em" fill="currentColor" class="fa-2x text-gray-300">
+                                                    <!--! Font Awesome Free 6.4.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc. -->
+                                                    <path d="M112 112c0 35.3-28.7 64-64 64V336c35.3 0 64 28.7 64 64H464c0-35.3 28.7-64 64-64V176c-35.3 0-64-28.7-64-64H112zM0 128C0 92.7 28.7 64 64 64H512c35.3 0 64 28.7 64 64V384c0 35.3-28.7 64-64 64H64c-35.3 0-64-28.7-64-64V128zM176 256a112 112 0 1 1 224 0 112 112 0 1 1 -224 0zm80-48c0 8.8 7.2 16 16 16v64h-8c-8.8 0-16 7.2-16 16s7.2 16 16 16h24 24c8.8 0 16-7.2 16-16s-7.2-16-16-16h-8V208c0-8.8-7.2-16-16-16H272c-8.8 0-16 7.2-16 16z"></path>
+                                                </svg></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </a></div>
+                        <div class="col-md-6 col-xl-3 mb-4"><a href="#">
+                                <div class="card shadow border-left-danger py-2" data-aos="fade" data-aos-delay="150" data-aos-once="true">
+                                    <div class="card-body">
+                                        <div class="row g-0 align-items-center">
+                                            <div class="col me-2">
+                                                <div class="text-uppercase text-danger fw-bold text-xs mb-1"><span>Expired</span></div>
+                                                <div class="text-dark fw-bold h5 mb-0"><span>{{ c_expired }}</span></div>
+                                            </div>
+                                            <div class="col-auto"><i class="fas fa-exclamation fa-2x text-gray-300"></i></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </a></div>
+                    </div>
+                    <div class="row">
+                        <div class="col-lg-7 col-xl-12">
+                            <div class="card shadow mb-4" data-aos="fade" data-aos-delay="300" data-aos-once="true">
+                                <div class="card-header d-flex justify-content-between align-items-center">
+                                    <h6 class="text-primary fw-bold m-0">Tags</h6>
+                                </div>
+                                <div class="card-body">
+                                    <form id="filterForm" class="mb-4 text-center">
+                                        {% for tag in tags %}
+                                        <div>
+    <div class="selectgroup selectgroup-pills">
+        <label class="selectgroup-item">
+            <input type="checkbox" name="value" value="{{ tag }}" class="selectgroup-input" checked />
+            <span class="selectgroup-button">{{ tag }}</span>
+        </label>
     </div>
-    {% if current_user.is_authenticated %}
-    <p class="mt-4 text-center"><a href="{{ url_for('add_item') }}" class="text-blue-500 hover:underline">Add a new item</a></p>
-    {% endif %}
-</div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-lg-7 col-xl-12">
+                            <div class="card shadow mb-4" data-aos="fade" data-aos-delay="400" data-aos-once="true">
+                                <div class="card-header d-flex justify-content-between align-items-center">
+                                    <h6 class="text-primary fw-bold m-0">Items</h6>
+                                    {% if current_user.is_authenticated %}
+                                    <a class="btn btn-primary btn-sm d-none d-sm-inline-block" role="button" href="{{ url_for('add_item') }}"><i class="fas fa-plus fa-sm text-white-50"></i>Add item</a>
+                                    {% endif %}
+                                </div>
+                                <div class="card-body">
+                                    <div class="table-responsive">
+                                        <table class="table">
+                                            <thead>
+                                                <tr>
+                                                    <th onclick="sortTable(0)">Quantity</th>
+                                                    <th onclick="sortTable(1)">Name</th>
+                                                    <th onclick="sortTable(2)">Expiry</th>
+                                                    <th onclick="sortTable(3)">Image</th>
+                                                    {% if current_user.is_authenticated %}
+                                                    <th>Quick Actions</th>
+                                                    {% else %}
+                                                    <th style="display: none;"></th>
+                                                    {% endif %}
+                                                    <th style="display: none;">Tags</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                            {% for item in items %}
+                                                <tr>
+                                                    <td>{{ item.quantity }}</td>
+                                                    <td>{{ item.name }}</td>
+                                                    <td>{{ item.expire_type }} {{ item.expiry_date }}</td>
+                                                    <td style="background: url(&quot;{{ item.image_url }}&quot;) center / contain no-repeat;"></td>
+                                                    <td>
+                                                        {%  if current_user.is_authenticated %}
+                                                        <div class="row">
+                                                            <div class="col"><a class="btn btn-primary" role="button" style="margin-right: 5px;" href="{{ url_for('edit', id=item.id) }}"><i class="far fa-edit"></i></a><a class="btn btn-danger" role="button" href="{{ url_for('qdelete', id=item.id) }}" style="background: rgb(187,65,13);"><i class="far fa-trash-alt"></i></a></div>
+                                                        </div>
+                                                        <div class="row">
+                                                            <div class="col"><a class="btn btn-primary" role="button" style="margin-right: 5px;" href="{{ url_for('qplus1', id=item.id) }}"><strong>+1</strong></a><a class="btn btn-primary" role="button" href="{{ url_for('qminus1', id=item.id) }}"><strong>-1</strong></a></div>
+                                                        </div>
+                                                        {% endif %}
+                                                    </td>
+                                                    <td style="display: none;">
+                                                        {% for tag in item.tags %}
+                                                            <span>{{ tag }}</span>
+                                                        {% endfor %}
+                                                    </td>
+                                                </tr>
+                                            {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div><a class="border rounded d-inline scroll-to-top" href="#page-top"><i class="fas fa-angle-up"></i></a>
+    </div>
 {% endblock %}
