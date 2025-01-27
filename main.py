@@ -106,7 +106,7 @@ class RegisterForm(FlaskForm):
 class AddItemForm(FlaskForm):
     name = StringField('Name of product')
     quantity = IntegerField('Quantity', validators=[InputRequired()])
-    barcode = IntegerField('Product barcode')
+    barcode = IntegerField('Product barcode', id='barcode_input')
     expiry_date = DateField('Date of expiry')
     expire_type = RadioField('Type of expiry', choices=['Best Before', 'Use By', 'Sell By'])
 
@@ -132,6 +132,36 @@ def setup_database(c):
               'password VARCHAR(128), active BOOLEAN)')
     conn.commit()
     conn.close()
+
+def __test_populate_db():
+    if os.getenv("FLASK_DEBUG", "False").lower() not in ["true", "1"]:
+        return
+    import random as r
+    with sql.connect(os.getenv("DB_PATH")) as conn:
+        password = generate_password_hash('test')
+        c = conn.cursor()
+        c.execute('INSERT INTO users (username, password, active) VALUES (?, ?, ?)', ('test', password, True))
+        conn.commit()
+        search = requests.get("https://world.openfoodfacts.net/api/v2/search?countries_tags_en=united-kingdom&sort_by=last_modified_t&page_size=100",
+                              headers={'User-Agent': f'Pyntry/{VERSION}DEV ({os.getenv("CONTACT_EMAIL")})'})
+        products = json.loads(search.text)['products']
+        c = conn.cursor()
+        for product in products:
+            if 'code' in product:
+                barcode = product['code']
+                if 'product_name' not in product:
+                    ... #todo: finish
+                name = product['product_name']
+                quantity = r.randint(1, 50)
+                expiry_date = datetime.now().date()
+                expire_type = r.choice(['Best Before', 'Use By', 'Sell By'])
+                image_url = product['image_front_small_url'] if 'image_front_small_url' in product else None
+                tags = product['categories']
+                c.execute('INSERT INTO items (name, quantity, barcode, expiry_date, expire_type, image_url, tags) '
+                          'VALUES (?, ?, ?, ?, ?, ?, ?)', (name, quantity, barcode, expiry_date, expire_type, image_url, tags))
+            else:
+                print("No barcode found.")
+        conn.commit()
 
 def get_product_info_from_api(barcode, format=False):
     endpoint = os.getenv("PRODUCT_API_URL").replace("{BARCODE}", str(barcode))
@@ -207,7 +237,22 @@ def get_items():
 @app.route('/')
 def index():
     items = get_items()
-    return render_template('index.html', items=items, today=datetime.now(), tags=get_all_tags())
+    c_bb = 0
+    c_ub = 0
+    c_sb = 0
+    c_expired = 0
+    today = datetime.now()
+    for item in items:
+        if item['expire_type'] == 'Best Before':
+            c_bb += 1
+        elif item['expire_type'] == 'Use By':
+            c_ub += 1
+        elif item['expire_type'] == 'Sell By':
+            c_sb += 1
+        if item['expiry_date'] < today:
+            c_expired += 1
+    return render_template('index.html', items=items, today=datetime.now(), tags=get_all_tags(),
+                           c_bb=c_bb, c_ub=c_ub, c_sb=c_sb, c_expired=c_expired)
 
 
 def url_has_allowed_host_and_scheme(next, host):
@@ -359,12 +404,42 @@ def edit(id):
 
 @app.route('/delete/<id>', methods=['GET'])
 @login_required
-def delete(id):
+def qdelete(id):
     with sql.connect(os.getenv("DB_PATH")) as conn:
         c = conn.cursor()
         c.execute('DELETE FROM items WHERE id = ?', (id,))
         conn.commit()
     flash('Item deleted successfully.', 'success')
     return redirect(url_for('index'))
+
+@app.route('/plus1/<id>', methods=['GET'])
+@login_required
+def qplus1(id):
+    with sql.connect(os.getenv("DB_PATH")) as conn:
+        c = conn.cursor()
+        c.execute('UPDATE items SET quantity = quantity + 1 WHERE id = ?', (id,))
+        conn.commit()
+    flash('Item quantity increased by 1.', 'success')
+    return redirect(url_for('index'))
+
+@app.route('/minus1/<id>', methods=['GET'])
+@login_required
+def qminus1(id):
+    with sql.connect(os.getenv("DB_PATH")) as conn:
+        c = conn.cursor()
+        c.execute('UPDATE items SET quantity = quantity - 1 WHERE id = ?', (id,))
+        conn.commit()
+    flash('Item quantity decreased by 1.', 'success')
+    return redirect(url_for('index'))
+
+with sql.connect(os.getenv("DB_PATH")) as conn:
+    c = conn.cursor()
+    c.execute('SELECT id FROM users')
+    users = c.fetchall()
+    c.execute('SELECT id FROM items')
+    items = c.fetchall()
+    if len(users) == 0 and len(items) == 0 and os.getenv("FLASK_DEBUG", "False").lower() in ["true", "1"]:
+        print("TESTING: POPULATING DB")
+        __test_populate_db()
 
 app.run(debug=os.getenv("FLASK_DEBUG", "False").lower() in ["true", "1"])
