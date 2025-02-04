@@ -35,9 +35,9 @@
                         if (barcodes.length > 0) {
                             const barcodeValue = barcodes[0].rawValue;
                             document.getElementById("scanner-info").innerText = `Detected barcode: ${barcodeValue}`;
+                            console.log(`Barcode detected: ${barcodeValue}`);
                             document.getElementById("barcode").value = barcodeValue;
                             handleBarcodeChange(barcodeValue);
-                            navigator.vibrate(200);
                         } else {
                             requestAnimationFrame(detectBarcode);
                         }
@@ -49,9 +49,13 @@
                 requestAnimationFrame(detectBarcode);
             }
 
-            function handleBarcodeChange(barcode) {
+function handleBarcodeChange(barcode) {
+    console.log(`Barcode detected: ${barcode}`);
     fetch(`{{ url_for('api_item', barcode='') }}${barcode}`)
-        .then(response => response.json())
+        .then(response => {
+            console.log('Response received:', response);
+            return response.json();
+        })
         .then(data => {
             const video = document.getElementById("video");
             video.style.display = 'none';
@@ -66,19 +70,23 @@
                 console.warn('No stream to stop');
             }
 
+            const scannerInfo = document.getElementById("scanner-info");
+            scannerInfo.innerText = `Detected barcode: ${barcode}`;
+            console.log('Data received:', data);
             if (data.image_front_small || data.image_url) {
                 let img = document.createElement('img');
                 if (data.image_url) {
-                    document.getElementById("scanner-info").innerText += '\n - Already in database!';
-                    document.getElementById("scanner-info").innerHTML += `<br><a href="{{ url_for('edit', id='') }}${data.id}">Edit item</a>`;
+                    scannerInfo.innerText += '\n - Already in database!';
+                    scannerInfo.innerHTML += `<br><a href="{{ url_for('edit', id='') }}${data.id}">Edit item</a>`;
                     img.src = data.image_url;
                 } else {
-                    document.getElementById("scanner-info").innerText += '\n - Not in database!';
+                    scannerInfo.innerText += '\n - Not in database!';
                     img.src = data.image_front_small;
                 }
                 img.alt = "Suggested item image";
                 document.querySelector('.video_show').appendChild(img);
             }
+
             if (data.name) {
                 document.querySelector('input[name="name"]').value = data.name;
                 let text = document.createElement('p');
@@ -155,7 +163,7 @@
                         <div class="card-body">
                             <form method="post" action="{{ url_for('add_item') }}" enctype="multipart/form-data">
                                 {{ form.csrf_token }}
-                                {{ form.barcode.label }} {{ form.barcode(class="form-control") }}
+                                {{ form.barcode.label }} {{ form.barcode(class="form-control", id="barcode") }}
                                 {{ form.name.label }} {{ form.name(class="form-control") }}
                                 {{ form.quantity.label }} {{ form.quantity(class="form-control") }}
                                 {{ form.expire_type.label }} {{ form.expire_type(class="form-control") }}

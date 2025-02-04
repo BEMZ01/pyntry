@@ -93,15 +93,15 @@ class User(UserMixin):
 
 
 class LoginForm(FlaskForm):
-    username = StringField('username', validators=[InputRequired()])
-    password = PasswordField('password', validators=[InputRequired()])
-    persist = BooleanField('remember_me')
+    username = StringField('Username', validators=[InputRequired()])
+    password = PasswordField('Password', validators=[InputRequired()])
+    persist = BooleanField('Remember Me?', default=True)
 
 
 class RegisterForm(FlaskForm):
-    username = StringField('username', validators=[InputRequired()])
-    password = PasswordField('password', validators=[InputRequired()])
-    password_confirm = PasswordField('password_confirm', validators=[InputRequired()])
+    username = StringField('Username', validators=[InputRequired()])
+    password = PasswordField('Password', validators=[InputRequired()])
+    password_confirm = PasswordField('Password Confirm', validators=[InputRequired()])
 
 
 class AddItemForm(FlaskForm):
@@ -146,10 +146,13 @@ def __test_populate_db():
         c.execute('INSERT INTO users (username, password, active) VALUES (?, ?, ?)', ('test', password, True))
         conn.commit()
         search = requests.get(
-            "https://world.openfoodfacts.net/api/v2/search?countries_tags_en=united-kingdom&sort_by=last_modified_t"
-            "&page_size=100",
+            "https://world.openfoodfacts.org/api/v2/search?countries_tags_en=united-kingdom&sort_by=last_modified_t&page_size=100",
             headers={'User-Agent': f'Pyntry/{VERSION}DEV ({os.getenv("CONTACT_EMAIL")})'})
-        products = json.loads(search.text)['products']
+        try:
+            products = json.loads(search.text)['products']
+        except json.decoder.JSONDecodeError:
+            print("Failed to decode JSON.")
+            return
         c = conn.cursor()
         for product in products:
             if 'code' in product:
@@ -256,7 +259,10 @@ def get_tag_counts(items):
     for item in items:
         for tag in item['tags']:
             for intag in tag.replace("en:", "").split(','):
-                tag_counts[intag.strip()] += 1
+                try:
+                    tag_counts[intag.strip()] += 1
+                except KeyError:
+                    print("Unable to parse tag: ", intag.strip())
     return tag_counts
 
 
@@ -477,4 +483,4 @@ with sql.connect(os.getenv("DB_PATH")) as conn:
         __test_populate_db()
 
 if __name__ == "__main__":
-    app.run(debug=os.getenv("FLASK_DEBUG", "False").lower() in ["true", "1"])
+    app.run(debug=os.getenv("FLASK_DEBUG", "False").lower() in ["true", "1"], host='0.0.0.0' if os.getenv("FLASK_DEBUG", "False").lower() in ["true", "1"] else None)
