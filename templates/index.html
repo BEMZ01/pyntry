@@ -132,6 +132,13 @@ function sortTable(n) {
                         shouldSwitch = true;
                         break;
                     }
+                } else if (n === 2) { // Sorting for expiry date column
+                    var xDate = new Date(x.innerHTML.split(' ').pop());
+                    var yDate = new Date(y.innerHTML.split(' ').pop());
+                    if (xDate > yDate) {
+                        shouldSwitch = true;
+                        break;
+                    }
                 } else {
                     if (x.innerHTML.toLowerCase() > y.innerHTML.toLowerCase()) {
                         shouldSwitch = true;
@@ -141,6 +148,13 @@ function sortTable(n) {
             } else if (dir === "desc") {
                 if (n === 0) { // Numeric sorting for quantity column
                     if (parseInt(x.innerHTML) < parseInt(y.innerHTML)) {
+                        shouldSwitch = true;
+                        break;
+                    }
+                } else if (n === 2) { // Sorting for expiry date column
+                    var dxDate = new Date(x.innerHTML.split(' ').pop());
+                    var dyDate = new Date(y.innerHTML.split(' ').pop());
+                    if (dxDate < dyDate) {
                         shouldSwitch = true;
                         break;
                     }
@@ -222,19 +236,28 @@ function sortTable(n) {
                                     </div>
                                 </div>
                             </a></div>
-                        <div class="col-md-6 col-xl-3 mb-4"><a href="#">
-                                <div class="card shadow border-left-danger py-2" data-aos="fade" data-aos-delay="150" data-aos-once="true">
-                                    <div class="card-body">
-                                        <div class="row g-0 align-items-center">
-                                            <div class="col me-2">
-                                                <div class="text-uppercase text-danger fw-bold text-xs mb-1"><span>Expired</span></div>
-                                                <div class="text-dark fw-bold h5 mb-0"><span>{{ c_expired }}</span></div>
-                                            </div>
-                                            <div class="col-auto"><i class="fas fa-exclamation fa-2x text-gray-300"></i></div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </a></div>
+                        <div class="col-md-6 col-xl-3 mb-4">
+    <a href="#">
+        <div class="card shadow border-left-danger py-2" data-aos="fade" data-aos-delay="150" data-aos-once="true">
+            <div class="card-body">
+                <div class="row g-0 align-items-center">
+                    <div class="col me-2">
+                        <div class="text-uppercase text-danger fw-bold text-xs mb-1"><span>Expired</span></div>
+                        <div class="text-dark fw-bold h5 mb-0"><span>{{ c_expired }}</span></div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-exclamation fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+                {% if c_expired > 0 %}
+                <form action="{{ url_for('delete_expired') }}" method="post" style="margin-top: 10px;">
+                    <button type="submit" class="btn btn-danger btn-sm" style="background: rgb(187,65,13);">Delete Expired Items</button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+    </a>
+</div>
                     </div>
                     <div class="row">
                         <div class="col-lg-7 col-xl-12">
@@ -246,10 +269,10 @@ function sortTable(n) {
                                 <div class="card-body collapse" id="tagsCardBody">
 <form id="filterForm" class="mb-4 text-center">
     <div class="selectgroup selectgroup-pills">
-        {% for tag in tags %}
+        {% for tag, count in tag_counts %}
         <label class="selectgroup-item">
             <input type="checkbox" name="value" value="{{ tag }}" class="selectgroup-input" />
-            <span class="selectgroup-button">{{ tag }} ({{ tag_counts[tag] }})</span>
+            <span class="selectgroup-button">{{ tag }} ({{ count }})</span>
         </label>
         {% endfor %}
     </div>
@@ -274,11 +297,7 @@ function sortTable(n) {
                                                     <th onclick="sortTable(1)">Name</th>
                                                     <th onclick="sortTable(2)">Expiry</th>
                                                     <th onclick="sortTable(3)">Image</th>
-                                                    {% if current_user.is_authenticated %}
                                                     <th>Quick Actions</th>
-                                                    {% else %}
-                                                    <th style="display: none;"></th>
-                                                    {% endif %}
                                                     <th style="display: none;">Tags</th>
                                                 </tr>
                                             </thead>
@@ -288,7 +307,7 @@ function sortTable(n) {
                                                     <td>{{ item.quantity }}</td>
                                                     <td>{{ item.name }}</td>
                                                     <td>{{ item.expire_type }} {{ item.expiry_date }}</td>
-                                                    <td style="background: url(&quot;{{ item.image_url }}&quot;) center / contain no-repeat;"></td>
+                                                    <td style="background: url({{ item.image_url }}) center / contain no-repeat;"></td>
                                                     <td>
                                                         {%  if current_user.is_authenticated %}
                                                         <div class="row">
@@ -297,6 +316,14 @@ function sortTable(n) {
                                                         <div class="row">
                                                             <div class="col"><a class="btn btn-primary" role="button" style="margin-right: 5px;" href="{{ url_for('qplus1', id=item.id) }}"><strong>+1</strong></a><a class="btn btn-primary" role="button" href="{{ url_for('qminus1', id=item.id) }}"><strong>-1</strong></a></div>
                                                         </div>
+                                                        {% else %}
+                                                            <div class="row">
+                                                                <div class="col"><a class="btn btn-primary disabled" role="button" style="margin-right: 5px;" href="#"><i class="far fa-edit"></i></a><a class="btn btn-danger disabled" role="button" href="#" style="background: rgb(187,65,13);"><i class="far fa-trash-alt"></i></a></div>
+                                                            </div>
+                                                            <div class="row">
+                                                                <div class="col"><a class="btn btn-primary disabled" role="button" style="margin-right: 5px;" href="#"><strong>+1</strong></a><a class="btn btn-primary disabled" role="button" href="#"><strong>-1</strong></a></div>
+                                                            </div>
+
                                                         {% endif %}
                                                     </td>
                                                     <td style="display: none;">
@@ -317,4 +344,6 @@ function sortTable(n) {
             </div>
         </div><a class="border rounded d-inline scroll-to-top" href="#page-top"><i class="fas fa-angle-up"></i></a>
     </div>
+  </div>
+</div>
 {% endblock %}

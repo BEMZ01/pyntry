@@ -251,11 +251,8 @@ def get_items():
 
 
 def get_tag_counts(items):
-    # tagslist.replace("en:", "").split(',')
     all_tags = get_all_tags()
-    tag_counts = {}
-    for tag in all_tags:
-        tag_counts[tag] = 0
+    tag_counts = {tag: 0 for tag in all_tags}
     for item in items:
         for tag in item['tags']:
             for intag in tag.replace("en:", "").split(','):
@@ -263,7 +260,8 @@ def get_tag_counts(items):
                     tag_counts[intag.strip()] += 1
                 except KeyError:
                     print("Unable to parse tag: ", intag.strip())
-    return tag_counts
+    sorted_tag_counts = sorted(tag_counts.items(), key=lambda x: x[1], reverse=True)
+    return sorted_tag_counts
 
 
 @app.route('/')
@@ -283,8 +281,9 @@ def index():
             c_sb += item['quantity']
         if datetime.strptime(item['expiry_date'], '%Y-%m-%d') < today:
             c_expired += item['quantity']
+    sorted_tag_counts = get_tag_counts(items)
     return render_template('index.html', items=items, today=datetime.now(), tags=get_all_tags(),
-                           c_bb=c_bb, c_ub=c_ub, c_sb=c_sb, c_expired=c_expired, tag_counts=get_tag_counts(items))
+                           c_bb=c_bb, c_ub=c_ub, c_sb=c_sb, c_expired=c_expired, tag_counts=sorted_tag_counts)
 
 
 def url_has_allowed_host_and_scheme(next, host):
@@ -368,7 +367,10 @@ def add_item():
             print(f"Getting product info for barcode: {barcode}")
             product_info = get_product_info_from_api(barcode)
             if product_info is not None:
-                image_url = product_info['image_url']
+                try:
+                    image_url = product_info['image_url']
+                except KeyError:
+                    image_url = None
                 tags = product_info['categories'] if 'categories' in product_info else None
             else:
                 image_url = None
@@ -469,6 +471,17 @@ def qminus1(id):
         c.execute('UPDATE items SET quantity = quantity - 1 WHERE id = ?', (id,))
         conn.commit()
     flash('Item quantity decreased by 1.', 'success')
+    return redirect(url_for('index'))
+
+@app.route('/delete_expired', methods=['POST'])
+@login_required
+def delete_expired():
+    today = datetime.now().strftime('%Y-%m-%d')
+    with sql.connect(os.getenv("DB_PATH")) as conn:
+        c = conn.cursor()
+        c.execute('DELETE FROM items WHERE expiry_date < ?', (today,))
+        conn.commit()
+    flash('Expired items deleted successfully.', 'success')
     return redirect(url_for('index'))
 
 
