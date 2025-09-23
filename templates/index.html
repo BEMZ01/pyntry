@@ -15,26 +15,70 @@
     <script>
 function filterTable() {
     var selectedTags = Array.from(document.querySelectorAll('.selectgroup-input:checked')).map(input => input.value.toLowerCase());
-    var rows = document.getElementById("items-table").getElementsByTagName("tbody")[0].getElementsByTagName("tr");
+    var searchInput = document.getElementById('search-bar');
+    var searchQuery = searchInput.value.toLowerCase();
+    var tableBody = document.getElementById("items-table").getElementsByTagName("tbody")[0];
+    var rows = Array.from(tableBody.getElementsByTagName("tr"));
     var visibleCount = 0;
 
-    for (var i = 0; i < rows.length; i++) {
-        var cells = rows[i].getElementsByTagName("td");
+    var nameMatchedRows = [];
+    var tagMatchedRows = [];
+    var noMatchRows = [];
+
+    rows.forEach(row => {
+        var cells = row.getElementsByTagName("td");
         if (cells.length > 5) {
+            var itemName = cells[1].innerText.toLowerCase();
             var tags = cells[5].innerText.toLowerCase().split('\n').map(tag => tag.trim()).filter(tag => tag !== "");
-            if (selectedTags.length === 0 || selectedTags.some(tag => tags.includes(tag))) {
-                rows[i].style.display = "";
-                visibleCount++;
+
+            var tagFilterMatch = selectedTags.length === 0 || selectedTags.some(tag => tags.includes(tag));
+
+            if (tagFilterMatch) {
+                var nameMatch = itemName.includes(searchQuery);
+                var tagSearchMatch = tags.some(tag => tag.includes(searchQuery));
+
+                if (nameMatch) {
+                    nameMatchedRows.push(row);
+                } else if (tagSearchMatch) {
+                    tagMatchedRows.push(row);
+                } else {
+                    noMatchRows.push(row);
+                }
             } else {
-                rows[i].style.display = "none";
+                noMatchRows.push(row);
             }
+        } else {
+            noMatchRows.push(row);
         }
+    });
+
+    // Clear the table body
+    while (tableBody.firstChild) {
+        tableBody.removeChild(tableBody.firstChild);
     }
+
+    // Append sorted rows
+    var sortedRows = nameMatchedRows.concat(tagMatchedRows);
+    sortedRows.forEach(row => {
+        row.style.display = "";
+        tableBody.appendChild(row);
+        visibleCount++;
+    });
+
+    noMatchRows.forEach(row => {
+        row.style.display = "none";
+        tableBody.appendChild(row);
+    });
+
 
     document.getElementById('visible-items-count').textContent = visibleCount;
     document.getElementById('total-items-count').textContent = rows.length;
 }
 document.addEventListener('DOMContentLoaded', () => {
+    const searchInput = document.getElementById('search-bar');
+    if (searchInput) {
+        searchInput.addEventListener('keyup', filterTable);
+    }
     const tagInputs = document.querySelectorAll('.selectgroup-input');
     tagInputs.forEach(input => {
         input.addEventListener('change', filterTable);
@@ -44,7 +88,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 document.addEventListener('DOMContentLoaded', () => {
     const today = new Date('{{ today.strftime("%Y-%m-%d") }}');
-    const rows = document.querySelectorAll('#items-table tr');
+    const rows = document.querySelectorAll('#items-table tbody tr');
 
     rows.forEach(row => {
         const expiryDateCell = row.cells[2];
@@ -53,7 +97,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const expiryDate = new Date(expiryDateText);
 
             if (expiryDate < today) {
-                row.style.textDecoration = 'line-through';
+                for (let i = 0; i < row.cells.length; i++) {
+                    row.cells[i].style.color = 'red';
+                    row.cells[i].style.fontWeight = 'bold';
+                }
             }
         }
     });
@@ -267,6 +314,7 @@ function sortTable(n) {
                                     <button id="toggle-tags" class="btn btn-secondary btn-sm">Select/Deselect All</button>
                                 </div>
                                 <div class="card-body collapse" id="tagsCardBody">
+                                    <label for="search-bar" class="visually-hidden">Search Items</label><input type="text" id="search-bar" class="form-control mb-3" placeholder="Search items...">
 <form id="filterForm" class="mb-4 text-center">
     <div class="selectgroup selectgroup-pills">
         {% for tag, count in tag_counts %}
@@ -342,7 +390,7 @@ function sortTable(n) {
                     </div>
                 </div>
             </div>
-        </div><a class="border rounded d-inline scroll-to-top" href="#page-top"><i class="fas fa-angle-up"></i></a>
+        </div><a class="border rounded d-inline scroll-to-top" href="#wrapper"><i class="fas fa-angle-up"></i></a>
     </div>
   </div>
 </div>

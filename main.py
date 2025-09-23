@@ -145,8 +145,23 @@ def __test_populate_db():
         c = conn.cursor()
         c.execute('INSERT INTO users (username, password, active) VALUES (?, ?, ?)', ('test', password, True))
         conn.commit()
+
+        # First, get the total number of products to determine the number of pages
+        count_request = requests.get(
+            "https://world.openfoodfacts.org/api/v2/search?countries_tags_en=united-kingdom&page_size=1",
+            headers={'User-Agent': f'Pyntry/{VERSION}DEV ({os.getenv("CONTACT_EMAIL")})'})
+        try:
+            count_data = json.loads(count_request.text)
+            total_products = count_data['count']
+            page_size = 100  # as used in the original request
+            max_pages = (total_products // page_size) + (1 if total_products % page_size > 0 else 0)
+            random_page = r.randint(1, max_pages)
+        except (json.decoder.JSONDecodeError, KeyError):
+            print("Failed to get total product count, defaulting to a random page in the first 100 pages.")
+            random_page = r.randint(1, 100)
+
         search = requests.get(
-            "https://world.openfoodfacts.org/api/v2/search?countries_tags_en=united-kingdom&sort_by=last_modified_t&page_size=100",
+            f"https://world.openfoodfacts.org/api/v2/search?countries_tags_en=united-kingdom&page_size=100&page={random_page}",
             headers={'User-Agent': f'Pyntry/{VERSION}DEV ({os.getenv("CONTACT_EMAIL")})'})
         try:
             products = json.loads(search.text)['products']
@@ -260,6 +275,8 @@ def get_tag_counts(items):
                     tag_counts[intag.strip()] += 1
                 except KeyError:
                     print("Unable to parse tag: ", intag.strip())
+    # Filter out tags with a count of 1 or less
+    tag_counts = {tag: count for tag, count in tag_counts.items() if count > 1}
     sorted_tag_counts = sorted(tag_counts.items(), key=lambda x: x[1], reverse=True)
     return sorted_tag_counts
 
@@ -271,7 +288,7 @@ def index():
     c_ub = 0
     c_sb = 0
     c_expired = 0
-    today = datetime.now()
+    today = datetime.now().date()
     for item in items:
         if item['expire_type'] == 'Best Before':
             c_bb += item['quantity']
@@ -279,7 +296,7 @@ def index():
             c_ub += item['quantity']
         elif item['expire_type'] == 'Sell By':
             c_sb += item['quantity']
-        if datetime.strptime(item['expiry_date'], '%Y-%m-%d') < today:
+        if datetime.strptime(item['expiry_date'], '%Y-%m-%d').date() < today:
             c_expired += item['quantity']
     sorted_tag_counts = get_tag_counts(items)
     return render_template('index.html', items=items, today=datetime.now(), tags=get_all_tags(),
@@ -479,7 +496,7 @@ def delete_expired():
     today = datetime.now().strftime('%Y-%m-%d')
     with sql.connect(os.getenv("DB_PATH")) as conn:
         c = conn.cursor()
-        c.execute('DELETE FROM items WHERE expiry_date < ?', (today,))
+        c.execute('DELETE FROM items WHERE DATE(expiry_date) < ?', (today,))
         conn.commit()
     flash('Expired items deleted successfully.', 'success')
     return redirect(url_for('index'))
@@ -491,7 +508,7 @@ with sql.connect(os.getenv("DB_PATH")) as conn:
     users = c.fetchall()
     c.execute('SELECT id FROM items')
     items = c.fetchall()
-    if len(users) == 1 and len(items) == 0 and os.getenv("FLASK_DEBUG", "False").lower() in ["true", "1"]:
+    if len(items) == 0 and os.getenv("FLASK_DEBUG", "False").lower() in ["true", "1"]:
         print("TESTING: POPULATING DB")
         __test_populate_db()
 
