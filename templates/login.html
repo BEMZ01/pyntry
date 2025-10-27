@@ -1,26 +1,49 @@
 {% extends "layout.html" %}
 {% block body %}
-  <div class="min-h-screen flex items-center justify-center bg-gray-100">
-    <div class="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
-      <h1 class="text-2xl font-bold mb-6 text-center">Login</h1>
-      <form method="post" action="{{ url_for('login') }}" enctype="multipart/form-data" class="space-y-4">
-        {{ form.csrf_token }}
-        <div>
-          <label class="block text-gray-700">{{ form.username.label }}</label>
-          {{ form.username(class="w-full p-2 border border-gray-300 rounded") }}
+    <style>
+    /* Ensure the checkbox is visible */
+input[type="checkbox"] {
+    display: inline-block;
+    padding: 0;
+    visibility: visible;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+}
+    </style>
+ <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-md-9 col-lg-12 col-xl-10">
+                <div class="card shadow-lg o-hidden border-0 my-5">
+                    <div class="card-body p-0">
+                        <div class="row">
+                            <div class="col-lg-6 col-xl-12 col-xxl-12">
+                                <div class="p-5">
+                                    <div class="text-center">
+                                        <h4 class="text-dark mb-4">Login</h4>
+                                    </div>
+                                    <form class="user" method="post" action="{{ url_for('login') }}" enctype="multipart/form-data">
+                                        {{ form.csrf_token }}
+                                        <div class="mb-3">
+                                            {{ form.username(class="form-control form-control-user", placeholder=form.username.name) }}
+                                        </div>
+                                        <div class="mb-3">
+                                            {{ form.password(class="form-control form-control-user", placeholder=form.password.name) }}
+                                        </div>
+                                        <div class="mb-3">
+                                            <div class="custom-checkbox small">
+                                                <div class="form-check">
+                                                    {{ form.persist(class="form-check-input", id="formCheck-1") }}
+                                                    <label class="form-check-label" for="formCheck-1">{{ form.persist.label }}</label></div>
+                                            </div>
+                                        </div><button class="btn btn-primary d-block btn-user w-100" type="submit">Login</button>
+                                        <hr>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
-        <div>
-          <label class="block text-gray-700">{{ form.password.label }}</label>
-          {{ form.password(class="w-full p-2 border border-gray-300 rounded") }}
-        </div>
-        <div class="flex items-center">
-          {{ form.persist(class="mr-2") }}
-          <label class="text-gray-700">{{ form.persist.label }}</label>
-        </div>
-        <div>
-          <input type="submit" value="Submit" class="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600">
-        </div>
-      </form>
     </div>
-  </div>
 {% endblock %}

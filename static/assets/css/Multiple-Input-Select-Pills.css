@@ -58,10 +58,10 @@
   line-height: 36px;
 }
 
-.selectgroup-input:focus + .selectgroup-button, .selectgroup-input:checked + .selectgroup-button {
-  background-color: #6777ef;
-  color: #fff;
-  z-index: 1;
+
+.selectgroup-item.selected .selectgroup-button {
+    background-color: #6777ef;
+    color: #fff;
 }
 
 .selectgroup-pills {

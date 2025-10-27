@@ -5,16 +5,26 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, shrink-to-fit=no">
     <title>Pyntry</title>
-    <style>
-        #notification {
-  opacity: 1;
-  transition: opacity 2s ease-out;
-}
+<style>
+  #notification {
+    opacity: 0;
+    transition: opacity 2s ease-out;
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    background-color: #38a169; /* Tailwind's green-500 */
+    color: white;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    z-index: 1000;
+    pointer-events: none;
+  }
 
-#notification.hidden {
-  opacity: 0;
-}
-    </style>
+  #notification.show {
+    opacity: 1;
+  }
+</style>
     <link rel="stylesheet" href="{{ url_for('static', filename="/assets/bootstrap/css/bootstrap.min.css")}}">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Nunito:200,200i,300,300i,400,400i,600,600i,700,700i,800,800i,900,900i&amp;display=swap">
     <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.12.0/css/all.css">
@@ -23,8 +33,11 @@
 </head>
 <body>
   <div id="page-top"></div>
-  <div id="notification" class="hidden fixed top-4 right-4 bg-green-500 text-white p-4 rounded shadow-lg" style="height: 0"></div>
-
+  {% for message in get_flashed_messages() %}
+      <div id="notification" class="hidden fixed top-4 right-4 bg-green-500 text-white p-4 rounded shadow-lg" style="height: 0">
+          {{ message }}
+        </div>
+  {% endfor %}
 
   {% block body %}{% endblock %}
 
@@ -32,9 +45,9 @@
   function showNotification(message) {
     const notification = document.getElementById('notification');
     notification.textContent = message;
-    notification.classList.remove('hidden');
+    notification.classList.add('show');
     setTimeout(() => {
-      notification.classList.add('hidden');
+      notification.classList.remove('show');
     }, 2000); // Show for 2 seconds before starting to fade out
   }
 
