@@ -1,6 +1,166 @@
 {% extends "layout.html" %}
 {% block body %}
+<style>
+    .selectgroup {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+    }
+    .selectgroup-item {
+        margin: 5px;
+        flex-grow: 1;
+        text-align: center;
+    }
+</style>
     <script>
+function filterTable() {
+    var selectedTags = Array.from(document.querySelectorAll('.selectgroup-input:checked')).map(input => input.value.toLowerCase());
+    var searchInput = document.getElementById('search-bar');
+    var searchQuery = searchInput.value.toLowerCase();
+    var tableBody = document.getElementById("items-table").getElementsByTagName("tbody")[0];
+    var rows = Array.from(tableBody.getElementsByTagName("tr"));
+    var visibleCount = 0;
+
+    var nameMatchedRows = [];
+    var tagMatchedRows = [];
+    var noMatchRows = [];
+
+    rows.forEach(row => {
+        var cells = row.getElementsByTagName("td");
+        if (cells.length > 5) {
+            var itemName = cells[1].innerText.toLowerCase();
+            var tags = cells[5].innerText.toLowerCase().split('\n').map(tag => tag.trim()).filter(tag => tag !== "");
+
+            var tagFilterMatch = selectedTags.length === 0 || selectedTags.some(tag => tags.includes(tag));
+
+            if (tagFilterMatch) {
+                var nameMatch = itemName.includes(searchQuery);
+                var tagSearchMatch = tags.some(tag => tag.includes(searchQuery));
+
+                if (nameMatch) {
+                    nameMatchedRows.push(row);
+                } else if (tagSearchMatch) {
+                    tagMatchedRows.push(row);
+                } else {
+                    noMatchRows.push(row);
+                }
+            } else {
+                noMatchRows.push(row);
+            }
+        } else {
+            noMatchRows.push(row);
+        }
+    });
+
+    // Clear the table body
+    while (tableBody.firstChild) {
+        tableBody.removeChild(tableBody.firstChild);
+    }
+
+    // Append sorted rows
+    var sortedRows = nameMatchedRows.concat(tagMatchedRows);
+    sortedRows.forEach(row => {
+        row.style.display = "";
+        tableBody.appendChild(row);
+        visibleCount++;
+    });
+
+    noMatchRows.forEach(row => {
+        row.style.display = "none";
+        tableBody.appendChild(row);
+    });
+
+
+    document.getElementById('visible-items-count').textContent = visibleCount;
+    document.getElementById('total-items-count').textContent = rows.length;
+}
+document.addEventListener('DOMContentLoaded', () => {
+    const searchInput = document.getElementById('search-bar');
+    if (searchInput) {
+        searchInput.addEventListener('keyup', filterTable);
+    }
+    const tagInputs = document.querySelectorAll('.selectgroup-input');
+    tagInputs.forEach(input => {
+        input.addEventListener('change', filterTable);
+    });
+    filterTable();
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+    const today = new Date('{{ today.strftime("%Y-%m-%d") }}');
+    const rows = document.querySelectorAll('#items-table tbody tr');
+
+    rows.forEach(row => {
+        const expiryDateCell = row.cells[2];
+        if (expiryDateCell) {
+            const expiryDateText = expiryDateCell.textContent.split(' ').pop();
+            const expiryDate = new Date(expiryDateText);
+
+            if (expiryDate < today) {
+                for (let i = 0; i < row.cells.length; i++) {
+                    row.cells[i].style.color = 'red';
+                    row.cells[i].style.fontWeight = 'bold';
+                }
+            }
+        }
+    });
+
+    const tagInputs = document.querySelectorAll('.selectgroup-input');
+
+    function updateTagCounts() {
+        const rows = document.querySelectorAll('#items-table tbody tr');
+        const visibleRows = Array.from(rows).filter(row => row.style.display !== 'none').length;
+        const totalRows = rows.length;
+        document.getElementById('visible-items-count').textContent = visibleRows;
+        document.getElementById('total-items-count').textContent = totalRows;
+    }
+
+    function toggleTagColor(input) {
+        const label = input.closest('.selectgroup-item');
+        if (input.checked) {
+            label.classList.add('selected');
+        } else {
+            label.classList.remove('selected');
+        }
+    }
+
+    tagInputs.forEach(input => {
+        input.addEventListener('change', () => {
+            toggleTagColor(input);
+            filterTable();
+            updateTagCounts();
+        });
+        toggleTagColor(input);
+    });
+
+    filterTable();
+    updateTagCounts();
+
+    const toggleButton = document.getElementById('toggle-tags');
+    const checkboxes = document.querySelectorAll('.selectgroup-input');
+
+    toggleButton.addEventListener('click', function() {
+        const allChecked = Array.from(checkboxes).every(checkbox => checkbox.checked);
+        checkboxes.forEach(checkbox => {
+            checkbox.checked = !allChecked;
+            toggleTagColor(checkbox);
+        });
+    });
+
+    //const tagsCardHeader = document.getElementById('tagsCardHeader');
+    //const tagsCardBody = document.getElementById('tagsCardBody');
+
+    //tagsCardHeader.addEventListener('click', function(event) {
+     //   if (event.target !== toggleButton) {
+     //       tagsCardBody.classList.toggle('collapse');
+     //   }
+    //});
+
+    //if (window.innerWidth <= 768) {
+    //    tagsCardBody.classList.add('collapse');
+    //}
+});
+
 function sortTable(n) {
     var table, rows, switching, i, x, y, shouldSwitch, dir, switchcount = 0;
     table = document.getElementById("items-table");
@@ -14,14 +174,42 @@ function sortTable(n) {
             x = rows[i].getElementsByTagName("TD")[n];
             y = rows[i + 1].getElementsByTagName("TD")[n];
             if (dir === "asc") {
-                if (x.innerHTML.toLowerCase() > y.innerHTML.toLowerCase()) {
-                    shouldSwitch = true;
-                    break;
+                if (n === 0) { // Numeric sorting for quantity column
+                    if (parseInt(x.innerHTML) > parseInt(y.innerHTML)) {
+                        shouldSwitch = true;
+                        break;
+                    }
+                } else if (n === 2) { // Sorting for expiry date column
+                    var xDate = new Date(x.innerHTML.split(' ').pop());
+                    var yDate = new Date(y.innerHTML.split(' ').pop());
+                    if (xDate > yDate) {
+                        shouldSwitch = true;
+                        break;
+                    }
+                } else {
+                    if (x.innerHTML.toLowerCase() > y.innerHTML.toLowerCase()) {
+                        shouldSwitch = true;
+                        break;
+                    }
                 }
             } else if (dir === "desc") {
-                if (x.innerHTML.toLowerCase() < y.innerHTML.toLowerCase()) {
-                    shouldSwitch = true;
-                    break;
+                if (n === 0) { // Numeric sorting for quantity column
+                    if (parseInt(x.innerHTML) < parseInt(y.innerHTML)) {
+                        shouldSwitch = true;
+                        break;
+                    }
+                } else if (n === 2) { // Sorting for expiry date column
+                    var dxDate = new Date(x.innerHTML.split(' ').pop());
+                    var dyDate = new Date(y.innerHTML.split(' ').pop());
+                    if (dxDate < dyDate) {
+                        shouldSwitch = true;
+                        break;
+                    }
+                } else {
+                    if (x.innerHTML.toLowerCase() < y.innerHTML.toLowerCase()) {
+                        shouldSwitch = true;
+                        break;
+                    }
                 }
             }
         }
@@ -37,47 +225,6 @@ function sortTable(n) {
         }
     }
 }
-
-function filterTable() {
-    var select = document.getElementById("tag");
-    var filter = Array.from(select.selectedOptions).map(option => option.value.toLowerCase());
-    var rows = document.getElementById("items-table").getElementsByTagName("tbody")[0].getElementsByTagName("tr");
-
-    for (var i = 0; i < rows.length; i++) {
-        var cells = rows[i].getElementsByTagName("td");
-        if (cells.length > 5) {
-            var tags = cells[5].innerText.toLowerCase().split('\n').map(tag => tag.trim()).filter(tag => tag !== "");
-            if (filter.length === 0 || filter.some(f => tags.includes(f))) {
-                rows[i].style.display = "";
-            } else {
-                rows[i].style.display = "none";
-            }
-        }
-    }
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-    const select = document.getElementById("tag");
-    select.addEventListener('change', filterTable);
-    filterTable();
-});
-
-document.addEventListener('DOMContentLoaded', () => {
-    const today = new Date('{{ today.strftime("%Y-%m-%d") }}');
-    const rows = document.querySelectorAll('#items-table tr');
-
-    rows.forEach(row => {
-        const expiryDateCell = row.cells[2];
-        if (expiryDateCell) {
-            const expiryDateText = expiryDateCell.textContent.split(' ').pop();
-            const expiryDate = new Date(expiryDateText);
-
-            if (expiryDate < today) {
-                row.style.textDecoration = 'line-through';
-            }
-        }
-    });
-});
 </script>
     <div id="wrapper">
         <div class="d-flex flex-column" id="content-wrapper">
@@ -136,63 +283,69 @@ document.addEventListener('DOMContentLoaded', () => {
                                     </div>
                                 </div>
                             </a></div>
-                        <div class="col-md-6 col-xl-3 mb-4"><a href="#">
-                                <div class="card shadow border-left-danger py-2" data-aos="fade" data-aos-delay="150" data-aos-once="true">
-                                    <div class="card-body">
-                                        <div class="row g-0 align-items-center">
-                                            <div class="col me-2">
-                                                <div class="text-uppercase text-danger fw-bold text-xs mb-1"><span>Expired</span></div>
-                                                <div class="text-dark fw-bold h5 mb-0"><span>{{ c_expired }}</span></div>
-                                            </div>
-                                            <div class="col-auto"><i class="fas fa-exclamation fa-2x text-gray-300"></i></div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </a></div>
+                        <div class="col-md-6 col-xl-3 mb-4">
+    <a href="#">
+        <div class="card shadow border-left-danger py-2" data-aos="fade" data-aos-delay="150" data-aos-once="true">
+            <div class="card-body">
+                <div class="row g-0 align-items-center">
+                    <div class="col me-2">
+                        <div class="text-uppercase text-danger fw-bold text-xs mb-1"><span>Expired</span></div>
+                        <div class="text-dark fw-bold h5 mb-0"><span>{{ c_expired }}</span></div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-exclamation fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+                {% if c_expired > 0 %}
+                <form action="{{ url_for('delete_expired') }}" method="post" style="margin-top: 10px;">
+                    <button type="submit" class="btn btn-danger btn-sm" style="background: rgb(187,65,13);">Delete Expired Items</button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+    </a>
+</div>
                     </div>
                     <div class="row">
                         <div class="col-lg-7 col-xl-12">
                             <div class="card shadow mb-4" data-aos="fade" data-aos-delay="300" data-aos-once="true">
-                                <div class="card-header d-flex justify-content-between align-items-center">
+                                <div class="card-header d-flex justify-content-between align-items-center" id="tagsCardHeader" data-bs-toggle="collapse" data-bs-target="#tagsCardBody">
                                     <h6 class="text-primary fw-bold m-0">Tags</h6>
+                                    <button id="toggle-tags" class="btn btn-secondary btn-sm">Select/Deselect All</button>
                                 </div>
-                                <div class="card-body">
-                                    <form id="filterForm" class="mb-4 text-center">
-                                        {% for tag in tags %}
-                                        <div>
+                                <div class="card-body collapse" id="tagsCardBody">
+                                    <label for="search-bar" class="visually-hidden">Search Items</label><input type="text" id="search-bar" class="form-control mb-3" placeholder="Search items...">
+<form id="filterForm" class="mb-4 text-center">
     <div class="selectgroup selectgroup-pills">
+        {% for tag, count in tag_counts %}
         <label class="selectgroup-item">
-            <input type="checkbox" name="value" value="{{ tag }}" class="selectgroup-input" checked />
-            <span class="selectgroup-button">{{ tag }}</span>
+            <input type="checkbox" name="value" value="{{ tag }}" class="selectgroup-input" />
+            <span class="selectgroup-button">{{ tag }} ({{ count }})</span>
         </label>
+        {% endfor %}
     </div>
-                            </div>
-                            {% endfor %}
+</form>
                         </div>
                     </div>
                     <div class="row">
                         <div class="col-lg-7 col-xl-12">
                             <div class="card shadow mb-4" data-aos="fade" data-aos-delay="400" data-aos-once="true">
                                 <div class="card-header d-flex justify-content-between align-items-center">
-                                    <h6 class="text-primary fw-bold m-0">Items</h6>
+                                    <h6 class="text-primary fw-bold m-0">Items (<span id="visible-items-count"></span>/<span id="total-items-count"></span>)</h6>
                                     {% if current_user.is_authenticated %}
-                                    <a class="btn btn-primary btn-sm d-none d-sm-inline-block" role="button" href="{{ url_for('add_item') }}"><i class="fas fa-plus fa-sm text-white-50"></i>Add item</a>
+                                    <a class="btn btn-primary btn-sm d-sm-inline-block" role="button" href="{{ url_for('add_item') }}"><i class="fas fa-plus fa-sm text-white-50"></i>Add item</a>
                                     {% endif %}
                                 </div>
                                 <div class="card-body">
                                     <div class="table-responsive">
-                                        <table class="table">
+                                        <table class="table" id="items-table">
                                             <thead>
                                                 <tr>
                                                     <th onclick="sortTable(0)">Quantity</th>
                                                     <th onclick="sortTable(1)">Name</th>
                                                     <th onclick="sortTable(2)">Expiry</th>
                                                     <th onclick="sortTable(3)">Image</th>
-                                                    {% if current_user.is_authenticated %}
                                                     <th>Quick Actions</th>
-                                                    {% else %}
-                                                    <th style="display: none;"></th>
-                                                    {% endif %}
                                                     <th style="display: none;">Tags</th>
                                                 </tr>
                                             </thead>
@@ -202,7 +355,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                                     <td>{{ item.quantity }}</td>
                                                     <td>{{ item.name }}</td>
                                                     <td>{{ item.expire_type }} {{ item.expiry_date }}</td>
-                                                    <td style="background: url(&quot;{{ item.image_url }}&quot;) center / contain no-repeat;"></td>
+                                                    <td style="background: url({{ item.image_url }}) center / contain no-repeat;"></td>
                                                     <td>
                                                         {%  if current_user.is_authenticated %}
                                                         <div class="row">
@@ -211,6 +364,14 @@ document.addEventListener('DOMContentLoaded', () => {
                                                         <div class="row">
                                                             <div class="col"><a class="btn btn-primary" role="button" style="margin-right: 5px;" href="{{ url_for('qplus1', id=item.id) }}"><strong>+1</strong></a><a class="btn btn-primary" role="button" href="{{ url_for('qminus1', id=item.id) }}"><strong>-1</strong></a></div>
                                                         </div>
+                                                        {% else %}
+                                                            <div class="row">
+                                                                <div class="col"><a class="btn btn-primary disabled" role="button" style="margin-right: 5px;" href="#"><i class="far fa-edit"></i></a><a class="btn btn-danger disabled" role="button" href="#" style="background: rgb(187,65,13);"><i class="far fa-trash-alt"></i></a></div>
+                                                            </div>
+                                                            <div class="row">
+                                                                <div class="col"><a class="btn btn-primary disabled" role="button" style="margin-right: 5px;" href="#"><strong>+1</strong></a><a class="btn btn-primary disabled" role="button" href="#"><strong>-1</strong></a></div>
+                                                            </div>
+
                                                         {% endif %}
                                                     </td>
                                                     <td style="display: none;">
@@ -229,6 +390,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                 </div>
             </div>
-        </div><a class="border rounded d-inline scroll-to-top" href="#page-top"><i class="fas fa-angle-up"></i></a>
+        </div><a class="border rounded d-inline scroll-to-top" href="#wrapper"><i class="fas fa-angle-up"></i></a>
     </div>
+  </div>
+</div>
 {% endblock %}
