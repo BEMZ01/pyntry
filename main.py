@@ -169,6 +169,16 @@ class AddItemForm(FlaskForm):
     expire_type = RadioField('Type of expiry', choices=['Best Before', 'Use By', 'Sell By'])
 
 
+class RoomForm(FlaskForm):
+    name = StringField('Room Name', validators=[InputRequired(), Length(min=1, max=100)])
+
+
+class ChoreForm(FlaskForm):
+    name = StringField('Chore Name', validators=[InputRequired(), Length(min=1, max=200)])
+    description = TextAreaField('Description')
+    repeat_days = IntegerField('Repeat every (days)', validators=[InputRequired()], default=7)
+
+
 @login_manager.user_loader
 def load_user(user_id: int) -> User | None:
     try:
@@ -188,6 +198,11 @@ def setup_database(c):
               'tags LIST)')
     c.execute('CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, username VARCHAR(32) UNIQUE, '
               'password VARCHAR(128), active BOOLEAN)')
+    c.execute('CREATE TABLE IF NOT EXISTS rooms (id INTEGER PRIMARY KEY, name TEXT NOT NULL)')
+    c.execute('CREATE TABLE IF NOT EXISTS chores (id INTEGER PRIMARY KEY, room_id INTEGER NOT NULL, '
+              'name TEXT NOT NULL, description TEXT, repeat_days INTEGER, '
+              'last_completed DATE, next_due DATE, '
+              'FOREIGN KEY (room_id) REFERENCES rooms (id) ON DELETE CASCADE)')
     conn.commit()
     conn.close()
 
@@ -338,8 +353,66 @@ def get_tag_counts(items):
     return sorted_tag_counts
 
 
+def get_upcoming_chores(days=7):
+    """Get chores due within the next N days"""
+    with sql.connect(os.getenv("DB_PATH")) as conn:
+        c = conn.cursor()
+        today = datetime.now().date()
+        future_date = today + timedelta(days=days)
+        c.execute('''SELECT chores.id, chores.name, chores.description, chores.repeat_days, 
+                     chores.last_completed, chores.next_due, rooms.name as room_name, rooms.id as room_id
+                     FROM chores 
+                     JOIN rooms ON chores.room_id = rooms.id
+                     WHERE chores.next_due <= ? OR chores.next_due IS NULL
+                     ORDER BY chores.next_due ASC''', (future_date.strftime('%Y-%m-%d'),))
+        chores = c.fetchall()
+    return [{'id': c[0], 'name': c[1], 'description': c[2], 'repeat_days': c[3], 
+             'last_completed': c[4], 'next_due': c[5], 'room_name': c[6], 'room_id': c[7]} 
+            for c in chores]
+
+
+def get_upcoming_and_expired_food(days=7):
+    """Get food items expiring soon or already expired"""
+    items = get_items()
+    today = datetime.now().date()
+    future_date = today + timedelta(days=days)
+    
+    upcoming = []
+    expired = []
+    
+    for item in items:
+        expiry = datetime.strptime(item['expiry_date'], '%Y-%m-%d').date()
+        if expiry < today:
+            expired.append(item)
+        elif expiry <= future_date:
+            upcoming.append(item)
+    
+    return sorted(upcoming, key=lambda x: x['expiry_date']), sorted(expired, key=lambda x: x['expiry_date'])
+
+
 @app.route('/')
 def index():
+    """Dashboard showing upcoming chores and food items"""
+    upcoming_chores = get_upcoming_chores(days=7)
+    upcoming_food, expired_food = get_upcoming_and_expired_food(days=7)
+    
+    # Count overdue chores
+    today = datetime.now().date()
+    overdue_chores = [c for c in upcoming_chores if c['next_due'] and 
+                      datetime.strptime(c['next_due'], '%Y-%m-%d').date() < today]
+    
+    return render_template('dashboard.html', 
+                         upcoming_chores=upcoming_chores,
+                         overdue_chores_count=len(overdue_chores),
+                         upcoming_food=upcoming_food,
+                         expired_food=expired_food,
+                         today=datetime.now())
+
+
+@app.route('/items')
+@login_required
+def items_list():
+    """View all items (original index page)"""
     items = get_items()
     c_bb = 0
     c_ub = 0
@@ -356,7 +429,7 @@ def index():
         if datetime.strptime(item['expiry_date'], '%Y-%m-%d').date() < today:
             c_expired += item['quantity']
     sorted_tag_counts = get_tag_counts(items)
-    return render_template('index.html', items=items, today=datetime.now(), tags=get_all_tags(),
+    return render_template('items.html', items=items, today=datetime.now(), tags=get_all_tags(),
                            c_bb=c_bb, c_ub=c_ub, c_sb=c_sb, c_expired=c_expired, tag_counts=sorted_tag_counts)
 
 
@@ -498,7 +571,7 @@ def add_item():
                                                        expire_type, image_url, tags))
             conn.commit()
         flash('Item added successfully.', 'success')
-        return redirect(url_for('index'))
+        return redirect(url_for('items_list'))
     return render_template('add_item.html', form=form)
 
 
@@ -539,7 +612,7 @@ def edit(id):
             item = c.fetchone()
         if item is None:
             flash('Item not found.', 'error')
-            return redirect(url_for('index'))
+            return redirect(url_for('items_list'))
         form.process(data={
             'name': item[1],
             'quantity': item[2],
@@ -561,7 +634,7 @@ def edit(id):
                       'WHERE id = ?', (name, quantity, barcode, expiry_date, expire_type, id))
             conn.commit()
         flash('Item updated successfully.', 'success')
-        return redirect(url_for('index'))
+        return redirect(url_for('items_list'))
     return render_template('edit_item.html', form=form, id=id)
 
 
@@ -573,7 +646,7 @@ def qdelete(id):
         c.execute('DELETE FROM items WHERE id = ?', (id,))
         conn.commit()
     flash('Item deleted successfully.', 'success')
-    return redirect(url_for('index'))
+    return redirect(url_for('items_list'))
 
 
 @app.route('/plus1/<int:id>', methods=['GET'])
@@ -584,7 +657,7 @@ def qplus1(id):
         c.execute('UPDATE items SET quantity = quantity + 1 WHERE id = ?', (id,))
         conn.commit()
     flash('Item quantity increased by 1.', 'success')
-    return redirect(url_for('index'))
+    return redirect(url_for('items_list'))
 
 
 @app.route('/minus1/<int:id>', methods=['GET'])
@@ -595,7 +668,7 @@ def qminus1(id):
         c.execute('UPDATE items SET quantity = quantity - 1 WHERE id = ?', (id,))
         conn.commit()
     flash('Item quantity decreased by 1.', 'success')
-    return redirect(url_for('index'))
+    return redirect(url_for('items_list'))
 
 @app.route('/delete_expired', methods=['POST'])
 @login_required
@@ -606,7 +679,162 @@ def delete_expired():
         c.execute('DELETE FROM items WHERE DATE(expiry_date) < ?', (today,))
         conn.commit()
     flash('Expired items deleted successfully.', 'success')
-    return redirect(url_for('index'))
+    return redirect(url_for('items_list'))
+
+
+# Chores and Rooms Routes
+@app.route('/chores')
+@login_required
+def chores_list():
+    """List all rooms"""
+    with sql.connect(os.getenv("DB_PATH")) as conn:
+        c = conn.cursor()
+        c.execute('SELECT * FROM rooms ORDER BY name')
+        rooms = c.fetchall()
+    rooms_data = []
+    for room in rooms:
+        room_id = room[0]
+        with sql.connect(os.getenv("DB_PATH")) as conn:
+            c = conn.cursor()
+            c.execute('SELECT COUNT(*) FROM chores WHERE room_id = ?', (room_id,))
+            chore_count = c.fetchone()[0]
+        rooms_data.append({'id': room[0], 'name': room[1], 'chore_count': chore_count})
+    return render_template('chores.html', rooms=rooms_data)
+
+
+@app.route('/chores/room/add', methods=['GET', 'POST'])
+@login_required
+def add_room():
+    form = RoomForm()
+    if form.validate_on_submit():
+        name = form.name.data
+        with sql.connect(os.getenv("DB_PATH")) as conn:
+            c = conn.cursor()
+            c.execute('INSERT INTO rooms (name) VALUES (?)', (name,))
+            conn.commit()
+        flash('Room created successfully.', 'success')
+        return redirect(url_for('chores_list'))
+    return render_template('add_room.html', form=form)
+
+
+@app.route('/chores/room/<int:room_id>')
+@login_required
+def room_detail(room_id):
+    """View chores in a specific room"""
+    with sql.connect(os.getenv("DB_PATH")) as conn:
+        c = conn.cursor()
+        c.execute('SELECT * FROM rooms WHERE id = ?', (room_id,))
+        room = c.fetchone()
+        if room is None:
+            flash('Room not found.', 'error')
+            return redirect(url_for('chores_list'))
+        
+        c.execute('SELECT * FROM chores WHERE room_id = ? ORDER BY next_due ASC', (room_id,))
+        chores = c.fetchall()
+    
+    room_data = {'id': room[0], 'name': room[1]}
+    chores_data = []
+    today = datetime.now().date()
+    
+    for chore in chores:
+        chore_dict = {
+            'id': chore[0],
+            'name': chore[2],
+            'description': chore[3],
+            'repeat_days': chore[4],
+            'last_completed': chore[5],
+            'next_due': chore[6],
+            'is_overdue': False
+        }
+        if chore[6]:
+            due_date = datetime.strptime(chore[6], '%Y-%m-%d').date()
+            chore_dict['is_overdue'] = due_date < today
+        chores_data.append(chore_dict)
+    
+    return render_template('room_detail.html', room=room_data, chores=chores_data, today=datetime.now())
+
+
+@app.route('/chores/room/<int:room_id>/add', methods=['GET', 'POST'])
+@login_required
+def add_chore(room_id):
+    # Verify room exists
+    with sql.connect(os.getenv("DB_PATH")) as conn:
+        c = conn.cursor()
+        c.execute('SELECT * FROM rooms WHERE id = ?', (room_id,))
+        room = c.fetchone()
+        if room is None:
+            flash('Room not found.', 'error')
+            return redirect(url_for('chores_list'))
+    
+    form = ChoreForm()
+    if form.validate_on_submit():
+        name = form.name.data
+        description = form.description.data
+        repeat_days = form.repeat_days.data
+        next_due = datetime.now().date().strftime('%Y-%m-%d')
+        
+        with sql.connect(os.getenv("DB_PATH")) as conn:
+            c = conn.cursor()
+            c.execute('INSERT INTO chores (room_id, name, description, repeat_days, next_due) VALUES (?, ?, ?, ?, ?)',
+                     (room_id, name, description, repeat_days, next_due))
+            conn.commit()
+        flash('Chore created successfully.', 'success')
+        return redirect(url_for('room_detail', room_id=room_id))
+    
+    return render_template('add_chore.html', form=form, room={'id': room[0], 'name': room[1]})
+
+
+@app.route('/chores/complete/<int:chore_id>', methods=['POST'])
+@login_required
+def complete_chore(chore_id):
+    with sql.connect(os.getenv("DB_PATH")) as conn:
+        c = conn.cursor()
+        c.execute('SELECT room_id, repeat_days FROM chores WHERE id = ?', (chore_id,))
+        chore = c.fetchone()
+        if chore is None:
+            flash('Chore not found.', 'error')
+            return redirect(url_for('chores_list'))
+        
+        room_id = chore[0]
+        repeat_days = chore[1]
+        today = datetime.now().date()
+        next_due = (today + timedelta(days=repeat_days)).strftime('%Y-%m-%d')
+        
+        c.execute('UPDATE chores SET last_completed = ?, next_due = ? WHERE id = ?',
+                 (today.strftime('%Y-%m-%d'), next_due, chore_id))
+        conn.commit()
+    
+    flash('Chore marked as complete!', 'success')
+    return redirect(url_for('room_detail', room_id=room_id))
+
+
+@app.route('/chores/delete/<int:chore_id>', methods=['GET'])
+@login_required
+def delete_chore(chore_id):
+    with sql.connect(os.getenv("DB_PATH")) as conn:
+        c = conn.cursor()
+        c.execute('SELECT room_id FROM chores WHERE id = ?', (chore_id,))
+        chore = c.fetchone()
+        if chore is None:
+            flash('Chore not found.', 'error')
+            return redirect(url_for('chores_list'))
+        room_id = chore[0]
+        c.execute('DELETE FROM chores WHERE id = ?', (chore_id,))
+        conn.commit()
+    flash('Chore deleted successfully.', 'success')
+    return redirect(url_for('room_detail', room_id=room_id))
+
+
+@app.route('/chores/room/delete/<int:room_id>', methods=['GET'])
+@login_required
+def delete_room(room_id):
+    with sql.connect(os.getenv("DB_PATH")) as conn:
+        c = conn.cursor()
+        c.execute('DELETE FROM chores WHERE room_id = ?', (room_id,))
+        c.execute('DELETE FROM rooms WHERE id = ?', (room_id,))
+        conn.commit()
+    flash('Room and all associated chores deleted successfully.', 'success')
+    return redirect(url_for('chores_list'))
 
 
 # Error handlers

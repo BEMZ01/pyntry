@@ -1,0 +1,64 @@
+{% extends "layout.html" %}
+{% block body %}
+<div id="wrapper">
+    <div class="d-flex flex-column" id="content-wrapper">
+        <div id="content">
+            <div class="container-fluid">
+                <div class="d-sm-flex justify-content-between align-items-center mb-4">
+                    <h3 class="text-dark mb-0">Add Chore to {{ room.name }}</h3>
+                    <a href="{{ url_for('room_detail', room_id=room.id) }}" class="btn btn-secondary">Back to Room</a>
+                </div>
+
+                <div class="row">
+                    <div class="col-lg-6">
+                        <div class="card shadow">
+                            <div class="card-body">
+                                <form method="POST">
+                                    {{ form.hidden_tag() }}
+                                    <div class="mb-3">
+                                        {{ form.name.label(class="form-label") }}
+                                        {{ form.name(class="form-control", placeholder="e.g., Clean Toilet, Vacuum Floor") }}
+                                        {% if form.name.errors %}
+                                            <div class="text-danger">
+                                                {% for error in form.name.errors %}
+                                                    <small>{{ error }}</small>
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="mb-3">
+                                        {{ form.description.label(class="form-label") }}
+                                        {{ form.description(class="form-control", rows="3", placeholder="Optional details about this chore") }}
+                                        {% if form.description.errors %}
+                                            <div class="text-danger">
+                                                {% for error in form.description.errors %}
+                                                    <small>{{ error }}</small>
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="mb-3">
+                                        {{ form.repeat_days.label(class="form-label") }}
+                                        {{ form.repeat_days(class="form-control") }}
+                                        {% if form.repeat_days.errors %}
+                                            <div class="text-danger">
+                                                {% for error in form.repeat_days.errors %}
+                                                    <small>{{ error }}</small>
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                        <small class="form-text text-muted">How often should this chore repeat? (e.g., 7 for weekly, 14 for bi-weekly)</small>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary">Create Chore</button>
+                                    <a href="{{ url_for('room_detail', room_id=room.id) }}" class="btn btn-secondary">Cancel</a>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <a class="border rounded d-inline scroll-to-top" href="#wrapper"><i class="fas fa-angle-up"></i></a>
+</div>
+{% endblock %}

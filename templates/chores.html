@@ -1,0 +1,55 @@
+{% extends "layout.html" %}
+{% block body %}
+<div id="wrapper">
+    <div class="d-flex flex-column" id="content-wrapper">
+        <div id="content">
+            <div class="container-fluid">
+                <div class="d-sm-flex justify-content-between align-items-center mb-4">
+                    <h3 class="text-dark mb-0">Chores - Rooms</h3>
+                    <div>
+                        <p class="mb-2 text-center">
+                            <a href="{{ url_for('index') }}" class="text-blue-500 hover:underline">Dashboard</a> | 
+                            <a href="{{ url_for('items_list') }}" class="text-blue-500 hover:underline">Items</a>
+                        </p>
+                    </div>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col">
+                        <a class="btn btn-primary" href="{{ url_for('add_room') }}">
+                            <i class="fas fa-plus"></i> Add Room
+                        </a>
+                    </div>
+                </div>
+
+                <div class="row">
+                    {% if rooms %}
+                        {% for room in rooms %}
+                            <div class="col-md-6 col-lg-4 mb-4">
+                                <div class="card shadow">
+                                    <div class="card-body">
+                                        <h5 class="card-title">{{ room.name }}</h5>
+                                        <p class="card-text text-muted">{{ room.chore_count }} chore(s)</p>
+                                        <div class="d-flex justify-content-between">
+                                            <a href="{{ url_for('room_detail', room_id=room.id) }}" class="btn btn-primary btn-sm">View Chores</a>
+                                            <a href="{{ url_for('delete_room', room_id=room.id) }}" class="btn btn-danger btn-sm" 
+                                               onclick="return confirm('Are you sure you want to delete this room and all its chores?')">Delete</a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="col-12">
+                            <div class="alert alert-info">
+                                No rooms found. <a href="{{ url_for('add_room') }}">Create your first room</a> to get started!
+                            </div>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    <a class="border rounded d-inline scroll-to-top" href="#wrapper"><i class="fas fa-angle-up"></i></a>
+</div>
+{% endblock %}
