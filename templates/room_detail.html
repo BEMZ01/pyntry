@@ -1,0 +1,87 @@
+{% extends "layout.html" %}
+{% block body %}
+<div id="wrapper">
+    <div class="d-flex flex-column" id="content-wrapper">
+        <div id="content">
+            <div class="container-fluid">
+                <div class="d-sm-flex justify-content-between align-items-center mb-4">
+                    <h3 class="text-dark mb-0">{{ room.name }}</h3>
+                    <a href="{{ url_for('chores_list') }}" class="btn btn-secondary">Back to Rooms</a>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col">
+                        <a class="btn btn-primary" href="{{ url_for('add_chore', room_id=room.id) }}">
+                            <i class="fas fa-plus"></i> Add Chore
+                        </a>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-12">
+                        <div class="card shadow">
+                            <div class="card-header">
+                                <h6 class="text-primary fw-bold m-0">Chores</h6>
+                            </div>
+                            <div class="card-body">
+                                {% if chores %}
+                                    <div class="table-responsive">
+                                        <table class="table table-striped">
+                                            <thead>
+                                                <tr>
+                                                    <th>Chore Name</th>
+                                                    <th>Description</th>
+                                                    <th>Repeats Every</th>
+                                                    <th>Points</th>
+                                                    <th>Last Completed</th>
+                                                    <th>Next Due</th>
+                                                    <th>Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for chore in chores %}
+                                                    <tr {% if chore.is_overdue %}class="table-danger"{% endif %}>
+                                                        <td>{{ chore.name }}</td>
+                                                        <td>{{ chore.description or '-' }}</td>
+                                                        <td>{{ chore.repeat_days }} days</td>
+                                                        <td><span class="badge bg-success">{{ chore.points }} pts</span></td>
+                                                        <td>{{ chore.last_completed or 'Never' }}</td>
+                                                        <td>
+                                                            {% if chore.next_due %}
+                                                                {{ chore.next_due }}
+                                                                {% if chore.is_overdue %}
+                                                                    <span class="badge bg-danger">OVERDUE</span>
+                                                                {% endif %}
+                                                            {% else %}
+                                                                -
+                                                            {% endif %}
+                                                        </td>
+                                                        <td>
+                                                            <form action="{{ url_for('complete_chore', chore_id=chore.id) }}" method="post" style="display: inline;">
+                                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                                                <button type="submit" class="btn btn-success btn-sm">Complete</button>
+                                                            </form>
+                                                            <a href="{{ url_for('delete_chore', chore_id=chore.id) }}" 
+                                                               class="btn btn-danger btn-sm"
+                                                               onclick="return confirm('Are you sure you want to delete this chore?')">Delete</a>
+                                                        </td>
+                                                    </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                {% else %}
+                                    <div class="alert alert-info">
+                                        No chores in this room yet. <a href="{{ url_for('add_chore', room_id=room.id) }}">Add your first chore!</a>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <a class="border rounded d-inline scroll-to-top" href="#wrapper"><i class="fas fa-angle-up"></i></a>
+</div>
+{% endblock %}

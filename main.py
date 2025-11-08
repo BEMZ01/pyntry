@@ -169,6 +169,17 @@ class AddItemForm(FlaskForm):
     expire_type = RadioField('Type of expiry', choices=['Best Before', 'Use By', 'Sell By'])
 
 
+class RoomForm(FlaskForm):
+    name = StringField('Room Name', validators=[InputRequired(), Length(min=1, max=100)])
+
+
+class ChoreForm(FlaskForm):
+    name = StringField('Chore Name', validators=[InputRequired(), Length(min=1, max=200)])
+    description = TextAreaField('Description')
+    repeat_days = IntegerField('Repeat every (days)', validators=[InputRequired()], default=7)
+    points = IntegerField('Points (awarded on due date)', validators=[InputRequired()], default=5)
+
+
 @login_manager.user_loader
 def load_user(user_id: int) -> User | None:
     try:
@@ -187,7 +198,30 @@ def setup_database(c):
               'barcode VARCHAR(32), expiry_date INT, expire_type VARCHAR(32), image_url VARCHAR(256), '
               'tags LIST)')
     c.execute('CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, username VARCHAR(32) UNIQUE, '
-              'password VARCHAR(128), active BOOLEAN)')
+              'password VARCHAR(128), active BOOLEAN, points INTEGER DEFAULT 0)')
+    c.execute('CREATE TABLE IF NOT EXISTS rooms (id INTEGER PRIMARY KEY, name TEXT NOT NULL)')
+    c.execute('CREATE TABLE IF NOT EXISTS chores (id INTEGER PRIMARY KEY, room_id INTEGER NOT NULL, '
+              'name TEXT NOT NULL, description TEXT, repeat_days INTEGER, '
+              'last_completed DATE, next_due DATE, points INTEGER DEFAULT 5, '
+              'FOREIGN KEY (room_id) REFERENCES rooms (id) ON DELETE CASCADE)')
+    c.execute('CREATE TABLE IF NOT EXISTS chore_completions (id INTEGER PRIMARY KEY, '
+              'chore_id INTEGER NOT NULL, user_id INTEGER NOT NULL, '
+              'completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, points_earned INTEGER DEFAULT 10, '
+              'FOREIGN KEY (chore_id) REFERENCES chores (id) ON DELETE CASCADE, '
+              'FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE)')
+    
+    # Add points column to existing users if it doesn't exist
+    try:
+        c.execute('SELECT points FROM users LIMIT 1')
+    except:
+        c.execute('ALTER TABLE users ADD COLUMN points INTEGER DEFAULT 0')
+    
+    # Add points column to existing chores if it doesn't exist
+    try:
+        c.execute('SELECT points FROM chores LIMIT 1')
+    except:
+        c.execute('ALTER TABLE chores ADD COLUMN points INTEGER DEFAULT 5')
+    
     conn.commit()
     conn.close()
 
@@ -338,8 +372,110 @@ def get_tag_counts(items):
     return sorted_tag_counts
 
 
+def get_upcoming_chores(days=7):
+    """Get chores due within the next N days"""
+    with sql.connect(os.getenv("DB_PATH")) as conn:
+        c = conn.cursor()
+        today = datetime.now().date()
+        future_date = today + timedelta(days=days)
+        c.execute('''SELECT chores.id, chores.name, chores.description, chores.repeat_days, 
+                     chores.last_completed, chores.next_due, rooms.name as room_name, rooms.id as room_id
+                     FROM chores 
+                     JOIN rooms ON chores.room_id = rooms.id
+                     WHERE chores.next_due <= ? OR chores.next_due IS NULL
+                     ORDER BY chores.next_due ASC''', (future_date.strftime('%Y-%m-%d'),))
+        chores = c.fetchall()
+    return [{'id': c[0], 'name': c[1], 'description': c[2], 'repeat_days': c[3], 
+             'last_completed': c[4], 'next_due': c[5], 'room_name': c[6], 'room_id': c[7]} 
+            for c in chores]
+
+
+def get_upcoming_and_expired_food(days=7):
+    """Get food items expiring soon or already expired"""
+    items = get_items()
+    today = datetime.now().date()
+    future_date = today + timedelta(days=days)
+    
+    upcoming = []
+    expired = []
+    
+    for item in items:
+        expiry = datetime.strptime(item['expiry_date'], '%Y-%m-%d').date()
+        if expiry < today:
+            expired.append(item)
+        elif expiry <= future_date:
+            upcoming.append(item)
+    
+    return sorted(upcoming, key=lambda x: x['expiry_date']), sorted(expired, key=lambda x: x['expiry_date'])
+
+
+def get_leaderboard(period='month', start_date=None, end_date=None):
+    """Get user leaderboard for a specific time period"""
+    with sql.connect(os.getenv("DB_PATH")) as conn:
+        c = conn.cursor()
+        
+        if period == 'month':
+            # Current month
+            today = datetime.now()
+            start_date = today.replace(day=1).strftime('%Y-%m-%d 00:00:00')
+            end_date = (today.replace(day=28) + timedelta(days=4)).replace(day=1).strftime('%Y-%m-%d 00:00:00')
+            c.execute('''SELECT users.username, SUM(chore_completions.points_earned) as total_points, 
+                         COUNT(chore_completions.id) as completions
+                         FROM users 
+                         LEFT JOIN chore_completions ON users.id = chore_completions.user_id
+                         WHERE chore_completions.completed_at >= ? AND chore_completions.completed_at < ?
+                         GROUP BY users.id, users.username
+                         ORDER BY total_points DESC''', (start_date, end_date))
+        elif period == 'all':
+            # All time
+            c.execute('''SELECT users.username, users.points as total_points, 
+                         COUNT(chore_completions.id) as completions
+                         FROM users 
+                         LEFT JOIN chore_completions ON users.id = chore_completions.user_id
+                         GROUP BY users.id, users.username
+                         ORDER BY total_points DESC''')
+        elif period == 'custom' and start_date and end_date:
+            # Custom range
+            c.execute('''SELECT users.username, SUM(chore_completions.points_earned) as total_points, 
+                         COUNT(chore_completions.id) as completions
+                         FROM users 
+                         LEFT JOIN chore_completions ON users.id = chore_completions.user_id
+                         WHERE chore_completions.completed_at >= ? AND chore_completions.completed_at <= ?
+                         GROUP BY users.id, users.username
+                         ORDER BY total_points DESC''', (start_date, end_date))
+        else:
+            return []
+        
+        results = c.fetchall()
+    
+    return [{'username': r[0], 'points': r[1] or 0, 'completions': r[2]} for r in results]
+
+
 @app.route('/')
 def index():
+    """Dashboard showing upcoming chores and food items"""
+    upcoming_chores = get_upcoming_chores(days=7)
+    upcoming_food, expired_food = get_upcoming_and_expired_food(days=7)
+    leaderboard = get_leaderboard(period='month')
+    
+    # Count overdue chores
+    today = datetime.now().date()
+    overdue_chores = [c for c in upcoming_chores if c['next_due'] and 
+                      datetime.strptime(c['next_due'], '%Y-%m-%d').date() < today]
+    
+    return render_template('dashboard.html', 
+                         upcoming_chores=upcoming_chores,
+                         overdue_chores_count=len(overdue_chores),
+                         upcoming_food=upcoming_food,
+                         expired_food=expired_food,
+                         leaderboard=leaderboard,
+                         today=datetime.now())
+
+
+@app.route('/items')
+@login_required
+def items_list():
+    """View all items (original index page)"""
     items = get_items()
     c_bb = 0
     c_ub = 0
@@ -356,7 +492,7 @@ def index():
         if datetime.strptime(item['expiry_date'], '%Y-%m-%d').date() < today:
             c_expired += item['quantity']
     sorted_tag_counts = get_tag_counts(items)
-    return render_template('index.html', items=items, today=datetime.now(), tags=get_all_tags(),
+    return render_template('items.html', items=items, today=datetime.now(), tags=get_all_tags(),
                            c_bb=c_bb, c_ub=c_ub, c_sb=c_sb, c_expired=c_expired, tag_counts=sorted_tag_counts)
 
 
@@ -399,11 +535,12 @@ def login():
     if current_user.is_authenticated:
         return redirect(url_for('index'))
 
-    # Check rate limit
-    ip_address = request.environ.get('HTTP_X_FORWARDED_FOR', request.remote_addr)
-    if not check_rate_limit(ip_address):
-        flash('Too many login attempts. Please try again later.', 'error')
-        return render_template('login.html', form=LoginForm()), 429
+    # Check rate limit (skip in testing mode)
+    if not app.config.get('TESTING', False):
+        ip_address = request.environ.get('HTTP_X_FORWARDED_FOR', request.remote_addr)
+        if not check_rate_limit(ip_address):
+            flash('Too many login attempts. Please try again later.', 'error')
+            return render_template('login.html', form=LoginForm()), 429
 
     form = LoginForm()
     if form.validate_on_submit():
@@ -411,8 +548,10 @@ def login():
         password = form.password.data
         persist = form.persist.data
 
-        # Record attempt for rate limiting
-        record_attempt(ip_address)
+        # Record attempt for rate limiting (skip in testing mode)
+        if not app.config.get('TESTING', False):
+            ip_address = request.environ.get('HTTP_X_FORWARDED_FOR', request.remote_addr)
+            record_attempt(ip_address)
 
         try:
             login_user(User(username, password), remember=persist)
@@ -498,7 +637,7 @@ def add_item():
                                                        expire_type, image_url, tags))
             conn.commit()
         flash('Item added successfully.', 'success')
-        return redirect(url_for('index'))
+        return redirect(url_for('items_list'))
     return render_template('add_item.html', form=form)
 
 
@@ -539,7 +678,7 @@ def edit(id):
             item = c.fetchone()
         if item is None:
             flash('Item not found.', 'error')
-            return redirect(url_for('index'))
+            return redirect(url_for('items_list'))
         form.process(data={
             'name': item[1],
             'quantity': item[2],
@@ -561,7 +700,7 @@ def edit(id):
                       'WHERE id = ?', (name, quantity, barcode, expiry_date, expire_type, id))
             conn.commit()
         flash('Item updated successfully.', 'success')
-        return redirect(url_for('index'))
+        return redirect(url_for('items_list'))
     return render_template('edit_item.html', form=form, id=id)
 
 
@@ -573,7 +712,7 @@ def qdelete(id):
         c.execute('DELETE FROM items WHERE id = ?', (id,))
         conn.commit()
     flash('Item deleted successfully.', 'success')
-    return redirect(url_for('index'))
+    return redirect(url_for('items_list'))
 
 
 @app.route('/plus1/<int:id>', methods=['GET'])
@@ -584,7 +723,7 @@ def qplus1(id):
         c.execute('UPDATE items SET quantity = quantity + 1 WHERE id = ?', (id,))
         conn.commit()
     flash('Item quantity increased by 1.', 'success')
-    return redirect(url_for('index'))
+    return redirect(url_for('items_list'))
 
 
 @app.route('/minus1/<int:id>', methods=['GET'])
@@ -595,7 +734,7 @@ def qminus1(id):
         c.execute('UPDATE items SET quantity = quantity - 1 WHERE id = ?', (id,))
         conn.commit()
     flash('Item quantity decreased by 1.', 'success')
-    return redirect(url_for('index'))
+    return redirect(url_for('items_list'))
 
 @app.route('/delete_expired', methods=['POST'])
 @login_required
@@ -606,7 +745,225 @@ def delete_expired():
         c.execute('DELETE FROM items WHERE DATE(expiry_date) < ?', (today,))
         conn.commit()
     flash('Expired items deleted successfully.', 'success')
-    return redirect(url_for('index'))
+    return redirect(url_for('items_list'))
+
+
+# Chores and Rooms Routes
+@app.route('/chores')
+@login_required
+def chores_list():
+    """List all rooms"""
+    with sql.connect(os.getenv("DB_PATH")) as conn:
+        c = conn.cursor()
+        c.execute('SELECT * FROM rooms ORDER BY name')
+        rooms = c.fetchall()
+    rooms_data = []
+    for room in rooms:
+        room_id = room[0]
+        with sql.connect(os.getenv("DB_PATH")) as conn:
+            c = conn.cursor()
+            c.execute('SELECT COUNT(*) FROM chores WHERE room_id = ?', (room_id,))
+            chore_count = c.fetchone()[0]
+        rooms_data.append({'id': room[0], 'name': room[1], 'chore_count': chore_count})
+    return render_template('chores.html', rooms=rooms_data)
+
+
+@app.route('/chores/room/add', methods=['GET', 'POST'])
+@login_required
+def add_room():
+    form = RoomForm()
+    if form.validate_on_submit():
+        name = form.name.data
+        with sql.connect(os.getenv("DB_PATH")) as conn:
+            c = conn.cursor()
+            c.execute('INSERT INTO rooms (name) VALUES (?)', (name,))
+            conn.commit()
+        flash('Room created successfully.', 'success')
+        return redirect(url_for('chores_list'))
+    return render_template('add_room.html', form=form)
+
+
+@app.route('/chores/room/<int:room_id>')
+@login_required
+def room_detail(room_id):
+    """View chores in a specific room"""
+    with sql.connect(os.getenv("DB_PATH")) as conn:
+        c = conn.cursor()
+        c.execute('SELECT * FROM rooms WHERE id = ?', (room_id,))
+        room = c.fetchone()
+        if room is None:
+            flash('Room not found.', 'error')
+            return redirect(url_for('chores_list'))
+        
+        c.execute('SELECT * FROM chores WHERE room_id = ? ORDER BY next_due ASC', (room_id,))
+        chores = c.fetchall()
+    
+    room_data = {'id': room[0], 'name': room[1]}
+    chores_data = []
+    today = datetime.now().date()
+    
+    for chore in chores:
+        chore_dict = {
+            'id': chore[0],
+            'name': chore[2],
+            'description': chore[3],
+            'repeat_days': chore[4],
+            'last_completed': chore[5],
+            'next_due': chore[6],
+            'points': chore[7] if len(chore) > 7 else 5,
+            'is_overdue': False
+        }
+        if chore[6]:
+            due_date = datetime.strptime(chore[6], '%Y-%m-%d').date()
+            chore_dict['is_overdue'] = due_date < today
+        chores_data.append(chore_dict)
+    
+    return render_template('room_detail.html', room=room_data, chores=chores_data, today=datetime.now())
+
+
+@app.route('/chores/room/<int:room_id>/add', methods=['GET', 'POST'])
+@login_required
+def add_chore(room_id):
+    # Verify room exists
+    with sql.connect(os.getenv("DB_PATH")) as conn:
+        c = conn.cursor()
+        c.execute('SELECT * FROM rooms WHERE id = ?', (room_id,))
+        room = c.fetchone()
+        if room is None:
+            flash('Room not found.', 'error')
+            return redirect(url_for('chores_list'))
+    
+    form = ChoreForm()
+    if form.validate_on_submit():
+        name = form.name.data
+        description = form.description.data
+        repeat_days = form.repeat_days.data
+        points = form.points.data
+        next_due = datetime.now().date().strftime('%Y-%m-%d')
+        
+        with sql.connect(os.getenv("DB_PATH")) as conn:
+            c = conn.cursor()
+            c.execute('INSERT INTO chores (room_id, name, description, repeat_days, next_due, points) VALUES (?, ?, ?, ?, ?, ?)',
+                     (room_id, name, description, repeat_days, next_due, points))
+            conn.commit()
+        flash('Chore created successfully.', 'success')
+        return redirect(url_for('room_detail', room_id=room_id))
+    
+    return render_template('add_chore.html', form=form, room={'id': room[0], 'name': room[1]})
+
+
+@app.route('/chores/complete/<int:chore_id>', methods=['POST'])
+@login_required
+def complete_chore(chore_id):
+    with sql.connect(os.getenv("DB_PATH")) as conn:
+        c = conn.cursor()
+        c.execute('SELECT room_id, repeat_days, next_due, points FROM chores WHERE id = ?', (chore_id,))
+        chore = c.fetchone()
+        if chore is None:
+            flash('Chore not found.', 'error')
+            return redirect(url_for('chores_list'))
+        
+        room_id = chore[0]
+        repeat_days = chore[1]
+        next_due_str = chore[2]
+        max_points = chore[3] if chore[3] else 5
+        
+        today = datetime.now().date()
+        
+        # Calculate points based on completion timing
+        if next_due_str:
+            due_date = datetime.strptime(next_due_str, '%Y-%m-%d').date()
+            days_early = (due_date - today).days
+            
+            if days_early == 0:
+                # Completed on due date - full points
+                points_earned = max_points
+            elif days_early < 0:
+                # Completed after due date - still full points (better late than never)
+                points_earned = max_points
+            else:
+                # Completed early - reduce points
+                # Calculate percentage: more days early = lower percentage
+                # 1 day early = 75%, 2 days = 50%, 3+ days = 25%
+                if days_early == 1:
+                    percentage = 0.75
+                elif days_early == 2:
+                    percentage = 0.5
+                else:
+                    percentage = 0.25
+                
+                points_earned = max_points * percentage
+                # Round to nearest 0.25
+                points_earned = round(points_earned * 4) / 4
+        else:
+            # No due date set, give full points
+            points_earned = max_points
+        
+        new_next_due = (today + timedelta(days=repeat_days)).strftime('%Y-%m-%d')
+        
+        # Update chore
+        c.execute('UPDATE chores SET last_completed = ?, next_due = ? WHERE id = ?',
+                 (today.strftime('%Y-%m-%d'), new_next_due, chore_id))
+        
+        # Award points to user
+        c.execute('UPDATE users SET points = points + ? WHERE id = ?', 
+                 (points_earned, current_user.id))
+        
+        # Record completion
+        c.execute('INSERT INTO chore_completions (chore_id, user_id, points_earned) VALUES (?, ?, ?)',
+                 (chore_id, current_user.id, points_earned))
+        
+        conn.commit()
+    
+    flash(f'Chore marked as complete! You earned {points_earned} points!', 'success')
+    return redirect(url_for('room_detail', room_id=room_id))
+
+
+@app.route('/chores/delete/<int:chore_id>', methods=['GET'])
+@login_required
+def delete_chore(chore_id):
+    with sql.connect(os.getenv("DB_PATH")) as conn:
+        c = conn.cursor()
+        c.execute('SELECT room_id FROM chores WHERE id = ?', (chore_id,))
+        chore = c.fetchone()
+        if chore is None:
+            flash('Chore not found.', 'error')
+            return redirect(url_for('chores_list'))
+        room_id = chore[0]
+        c.execute('DELETE FROM chores WHERE id = ?', (chore_id,))
+        conn.commit()
+    flash('Chore deleted successfully.', 'success')
+    return redirect(url_for('room_detail', room_id=room_id))
+
+
+@app.route('/chores/room/delete/<int:room_id>', methods=['GET'])
+@login_required
+def delete_room(room_id):
+    with sql.connect(os.getenv("DB_PATH")) as conn:
+        c = conn.cursor()
+        c.execute('DELETE FROM chores WHERE room_id = ?', (room_id,))
+        c.execute('DELETE FROM rooms WHERE id = ?', (room_id,))
+        conn.commit()
+    flash('Room and all associated chores deleted successfully.', 'success')
+    return redirect(url_for('chores_list'))
+
+
+@app.route('/leaderboard')
+def leaderboard():
+    """View leaderboard with different time periods"""
+    period = request.args.get('period', 'month')
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+    
+    if period == 'custom' and start_date and end_date:
+        leaders = get_leaderboard(period='custom', start_date=start_date, end_date=end_date)
+    elif period == 'all':
+        leaders = get_leaderboard(period='all')
+    else:
+        leaders = get_leaderboard(period='month')
+    
+    return render_template('leaderboard.html', leaderboard=leaders, period=period,
+                         start_date=start_date, end_date=end_date)
 
 
 # Error handlers

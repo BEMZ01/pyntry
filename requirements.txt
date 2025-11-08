@@ -1,4 +1,4 @@
-﻿blinker
+blinker
 certifi
 charset-normalizer
 click
@@ -15,3 +15,5 @@ requests
 urllib3
 Werkzeug
 WTForms
+pytest
+pytest-cov
