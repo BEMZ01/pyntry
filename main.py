@@ -7,34 +7,68 @@ from pprint import pprint
 from flask import Flask, render_template, request, redirect, url_for, session, flash, abort
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from flask_wtf import FlaskForm
+from flask_wtf.csrf import CSRFProtect
 from wtforms import StringField, PasswordField, BooleanField, DecimalField, RadioField, SelectField, TextAreaField, \
     FileField
 from wtforms.fields.datetime import DateField
 from wtforms.fields.numeric import IntegerRangeField, IntegerField
-from wtforms.validators import InputRequired
+from wtforms.validators import InputRequired, Length, Regexp, ValidationError
 import sqlite3 as sql
 from dotenv import load_dotenv
 from werkzeug.security import generate_password_hash, check_password_hash
 import requests
-from datetime import datetime
+from datetime import datetime, timedelta
+from functools import wraps
+from urllib.parse import urlparse, urljoin
 
 load_dotenv()
 if os.getenv("APP_SECRET") is None or os.getenv("APP_SECRET") == "":
     print("APP_SECRET not found in .env file. Generating one...")
-    with open('.env', 'w+') as f:
-        # check if the last character is a newline
-        if f.read()[:-1] != '\n':
-            f.write('\n')
-        f.write(f'APP_SECRET={os.urandom(128).hex()}')
-    print("APP_SECRET generated.")
-    load_dotenv()
+    with open('.env', 'a') as f:
+        f.write(f'\nAPP_SECRET={os.urandom(32).hex()}\n')
+    print("APP_SECRET generated. Please restart the application.")
+    exit(1)
 
 app = Flask(__name__)
 login_manager = LoginManager()
 
 app.secret_key = os.getenv("APP_SECRET")
+# Security configurations
+app.config['SESSION_COOKIE_SECURE'] = os.getenv("FLASK_DEBUG", "False").lower() not in ["true", "1"]
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=24)
+app.config['WTF_CSRF_TIME_LIMIT'] = None  # CSRF tokens don't expire
+app.config['WTF_CSRF_SSL_STRICT'] = os.getenv("FLASK_DEBUG", "False").lower() not in ["true", "1"]
+
+csrf = CSRFProtect(app)
 login_manager.init_app(app)
 login_manager.login_view = "login"
+
+# Rate limiting storage (in production, use Redis or similar)
+login_attempts = {}
+
+def cleanup_old_attempts():
+    """Clean up login attempts older than 15 minutes"""
+    cutoff_time = datetime.now() - timedelta(minutes=15)
+    for ip in list(login_attempts.keys()):
+        login_attempts[ip] = [t for t in login_attempts[ip] if t > cutoff_time]
+        if not login_attempts[ip]:
+            del login_attempts[ip]
+
+def check_rate_limit(ip_address, max_attempts=5, window_minutes=15):
+    """Check if IP has exceeded rate limit"""
+    cleanup_old_attempts()
+    attempts = login_attempts.get(ip_address, [])
+    cutoff_time = datetime.now() - timedelta(minutes=window_minutes)
+    recent_attempts = [t for t in attempts if t > cutoff_time]
+    return len(recent_attempts) < max_attempts
+
+def record_attempt(ip_address):
+    """Record a login attempt"""
+    if ip_address not in login_attempts:
+        login_attempts[ip_address] = []
+    login_attempts[ip_address].append(datetime.now())
 
 
 class User(UserMixin):
@@ -92,15 +126,38 @@ class User(UserMixin):
         self.active = True if user[3] else False
 
 
+def validate_password_strength(form, field):
+    """Validate password meets security requirements"""
+    password = field.data
+    if len(password) < 8:
+        raise ValidationError('Password must be at least 8 characters long.')
+    if not re.search(r'[A-Z]', password):
+        raise ValidationError('Password must contain at least one uppercase letter.')
+    if not re.search(r'[a-z]', password):
+        raise ValidationError('Password must contain at least one lowercase letter.')
+    if not re.search(r'[0-9]', password):
+        raise ValidationError('Password must contain at least one number.')
+
+
 class LoginForm(FlaskForm):
-    username = StringField('Username', validators=[InputRequired()])
+    username = StringField('Username', validators=[
+        InputRequired(),
+        Length(min=3, max=32, message='Username must be between 3 and 32 characters')
+    ])
     password = PasswordField('Password', validators=[InputRequired()])
     persist = BooleanField('Remember Me?', default=True)
 
 
 class RegisterForm(FlaskForm):
-    username = StringField('Username', validators=[InputRequired()])
-    password = PasswordField('Password', validators=[InputRequired()])
+    username = StringField('Username', validators=[
+        InputRequired(),
+        Length(min=3, max=32, message='Username must be between 3 and 32 characters'),
+        Regexp(r'^[a-zA-Z0-9_]+$', message='Username can only contain letters, numbers, and underscores')
+    ])
+    password = PasswordField('Password', validators=[
+        InputRequired(),
+        validate_password_strength
+    ])
     password_confirm = PasswordField('Password Confirm', validators=[InputRequired()])
 
 
@@ -303,23 +360,60 @@ def index():
                            c_bb=c_bb, c_ub=c_ub, c_sb=c_sb, c_expired=c_expired, tag_counts=sorted_tag_counts)
 
 
-def url_has_allowed_host_and_scheme(next, host):
-    print(next, host)
-    if next is None:
-        return True
-    allowed_hosts = os.getenv("ALLOWED_HOSTS").strip().split(',')
-    return re.match(r'^https?://[^/]+', next) and next.split('/')[2] in allowed_hosts
+def is_safe_url(target):
+    """Check if the URL is safe for redirects"""
+    if not target:
+        return False
+    ref_url = urlparse(request.host_url)
+    test_url = urlparse(urljoin(request.host_url, target))
+    return test_url.scheme in ('http', 'https') and ref_url.netloc == test_url.netloc
+
+
+@app.after_request
+def set_security_headers(response):
+    """Add security headers to all responses"""
+    # Prevent clickjacking
+    response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+    # Prevent MIME type sniffing
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    # Enable XSS filter
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    # Content Security Policy
+    response.headers['Content-Security-Policy'] = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline'; "
+        "style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data: https:; "
+        "font-src 'self'; "
+        "connect-src 'self';"
+    )
+    # Referrer Policy
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    # Permissions Policy
+    response.headers['Permissions-Policy'] = 'geolocation=(), microphone=(), camera=()'
+    return response
 
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if current_user.is_authenticated:
         return redirect(url_for('index'))
+
+    # Check rate limit
+    ip_address = request.environ.get('HTTP_X_FORWARDED_FOR', request.remote_addr)
+    if not check_rate_limit(ip_address):
+        flash('Too many login attempts. Please try again later.', 'error')
+        return render_template('login.html', form=LoginForm()), 429
+
     form = LoginForm()
     if form.validate_on_submit():
         username = form.username.data
         password = form.password.data
         persist = form.persist.data
+
+        # Record attempt for rate limiting
+        record_attempt(ip_address)
+
         try:
             login_user(User(username, password), remember=persist)
         except ValueError as e:
@@ -327,12 +421,14 @@ def login():
             flash(str(e), 'error')
             return redirect(url_for('login'))
         session['username'] = username
+        session.permanent = persist
         print(f'{username} logged in successfully.')
         flash('Logged in successfully.', 'success')
-        next = request.args.get('next')
-        if not url_has_allowed_host_and_scheme(next, request.host):
-            return abort(400)
-        return redirect(next or url_for('index'))
+
+        next_page = request.args.get('next')
+        if next_page and is_safe_url(next_page):
+            return redirect(next_page)
+        return redirect(url_for('index'))
     return render_template('login.html', form=form)
 
 
@@ -407,8 +503,16 @@ def add_item():
 
 
 @app.route('/api/get_item', methods=['GET'])
+@login_required
 def api_item():
     barcode = request.args.get('barcode')
+    if not barcode:
+        return json.dumps({'error': 'Barcode parameter is required.'}), 400
+
+    # Validate barcode is numeric
+    if not barcode.isdigit():
+        return json.dumps({'error': 'Invalid barcode format.'}), 400
+
     with sql.connect(os.getenv("DB_PATH")) as conn:
         c = conn.cursor()
         c.execute('SELECT * FROM items WHERE barcode = ?', (barcode,))
@@ -416,14 +520,14 @@ def api_item():
     if item is None:
         item = get_product_info_from_api(barcode, True)
         if item is None:
-            return json.dumps({'error': 'Item not found.'})
+            return json.dumps({'error': 'Item not found.'}), 404
         else:
-            return item
+            return json.dumps(item), 200
     return json.dumps(
-        dict(zip(['id', 'name', 'quantity', 'barcode', 'expiry_date', 'expire_type', 'image_url', 'tags'], item)))
+        dict(zip(['id', 'name', 'quantity', 'barcode', 'expiry_date', 'expire_type', 'image_url', 'tags'], item))), 200
 
 
-@app.route('/edit/<id>', methods=['GET', 'POST'])
+@app.route('/edit/<int:id>', methods=['GET', 'POST'])
 @login_required
 def edit(id):
     form = AddItemForm()
@@ -433,6 +537,9 @@ def edit(id):
             c = conn.cursor()
             c.execute('SELECT * FROM items WHERE id = ?', (id,))
             item = c.fetchone()
+        if item is None:
+            flash('Item not found.', 'error')
+            return redirect(url_for('index'))
         form.process(data={
             'name': item[1],
             'quantity': item[2],
@@ -458,7 +565,7 @@ def edit(id):
     return render_template('edit_item.html', form=form, id=id)
 
 
-@app.route('/delete/<id>', methods=['GET'])
+@app.route('/delete/<int:id>', methods=['GET'])
 @login_required
 def qdelete(id):
     with sql.connect(os.getenv("DB_PATH")) as conn:
@@ -469,7 +576,7 @@ def qdelete(id):
     return redirect(url_for('index'))
 
 
-@app.route('/plus1/<id>', methods=['GET'])
+@app.route('/plus1/<int:id>', methods=['GET'])
 @login_required
 def qplus1(id):
     with sql.connect(os.getenv("DB_PATH")) as conn:
@@ -480,7 +587,7 @@ def qplus1(id):
     return redirect(url_for('index'))
 
 
-@app.route('/minus1/<id>', methods=['GET'])
+@app.route('/minus1/<int:id>', methods=['GET'])
 @login_required
 def qminus1(id):
     with sql.connect(os.getenv("DB_PATH")) as conn:
@@ -502,6 +609,34 @@ def delete_expired():
     return redirect(url_for('index'))
 
 
+# Error handlers
+@app.errorhandler(400)
+def bad_request(e):
+    return render_template('error.html', error_code=400, error_message='Bad Request'), 400
+
+
+@app.errorhandler(403)
+def forbidden(e):
+    return render_template('error.html', error_code=403, error_message='Forbidden'), 403
+
+
+@app.errorhandler(404)
+def not_found(e):
+    return render_template('error.html', error_code=404, error_message='Page Not Found'), 404
+
+
+@app.errorhandler(429)
+def too_many_requests(e):
+    return render_template('error.html', error_code=429, error_message='Too Many Requests'), 429
+
+
+@app.errorhandler(500)
+def internal_server_error(e):
+    # Log the error but don't expose details to user
+    print(f"Internal server error: {e}")
+    return render_template('error.html', error_code=500, error_message='Internal Server Error'), 500
+
+
 with sql.connect(os.getenv("DB_PATH")) as conn:
     c = conn.cursor()
     c.execute('SELECT id FROM users')
@@ -513,4 +648,5 @@ with sql.connect(os.getenv("DB_PATH")) as conn:
         __test_populate_db()
 
 if __name__ == "__main__":
-    app.run(debug=os.getenv("FLASK_DEBUG", "False").lower() in ["true", "1"], host='0.0.0.0' if os.getenv("FLASK_DEBUG", "False").lower() in ["true", "1"] else None)
+    app.run(debug=os.getenv("FLASK_DEBUG", "False").lower() in ["true", "1"],
+            host='0.0.0.0' if os.getenv("FLASK_DEBUG", "False").lower() in ["true", "1"] else None)
