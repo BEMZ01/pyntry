@@ -32,6 +32,7 @@
                                                     <th>Chore Name</th>
                                                     <th>Description</th>
                                                     <th>Repeats Every</th>
+                                                    <th>Points</th>
                                                     <th>Last Completed</th>
                                                     <th>Next Due</th>
                                                     <th>Actions</th>
@@ -43,6 +44,7 @@
                                                         <td>{{ chore.name }}</td>
                                                         <td>{{ chore.description or '-' }}</td>
                                                         <td>{{ chore.repeat_days }} days</td>
+                                                        <td><span class="badge bg-success">{{ chore.points }} pts</span></td>
                                                         <td>{{ chore.last_completed or 'Never' }}</td>
                                                         <td>
                                                             {% if chore.next_due %}

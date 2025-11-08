@@ -177,6 +177,7 @@ class ChoreForm(FlaskForm):
     name = StringField('Chore Name', validators=[InputRequired(), Length(min=1, max=200)])
     description = TextAreaField('Description')
     repeat_days = IntegerField('Repeat every (days)', validators=[InputRequired()], default=7)
+    points = IntegerField('Points (awarded on due date)', validators=[InputRequired()], default=5)
 
 
 @login_manager.user_loader
@@ -197,12 +198,30 @@ def setup_database(c):
               'barcode VARCHAR(32), expiry_date INT, expire_type VARCHAR(32), image_url VARCHAR(256), '
               'tags LIST)')
     c.execute('CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, username VARCHAR(32) UNIQUE, '
-              'password VARCHAR(128), active BOOLEAN)')
+              'password VARCHAR(128), active BOOLEAN, points INTEGER DEFAULT 0)')
     c.execute('CREATE TABLE IF NOT EXISTS rooms (id INTEGER PRIMARY KEY, name TEXT NOT NULL)')
     c.execute('CREATE TABLE IF NOT EXISTS chores (id INTEGER PRIMARY KEY, room_id INTEGER NOT NULL, '
               'name TEXT NOT NULL, description TEXT, repeat_days INTEGER, '
-              'last_completed DATE, next_due DATE, '
+              'last_completed DATE, next_due DATE, points INTEGER DEFAULT 5, '
               'FOREIGN KEY (room_id) REFERENCES rooms (id) ON DELETE CASCADE)')
+    c.execute('CREATE TABLE IF NOT EXISTS chore_completions (id INTEGER PRIMARY KEY, '
+              'chore_id INTEGER NOT NULL, user_id INTEGER NOT NULL, '
+              'completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, points_earned INTEGER DEFAULT 10, '
+              'FOREIGN KEY (chore_id) REFERENCES chores (id) ON DELETE CASCADE, '
+              'FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE)')
+    
+    # Add points column to existing users if it doesn't exist
+    try:
+        c.execute('SELECT points FROM users LIMIT 1')
+    except:
+        c.execute('ALTER TABLE users ADD COLUMN points INTEGER DEFAULT 0')
+    
+    # Add points column to existing chores if it doesn't exist
+    try:
+        c.execute('SELECT points FROM chores LIMIT 1')
+    except:
+        c.execute('ALTER TABLE chores ADD COLUMN points INTEGER DEFAULT 5')
+    
     conn.commit()
     conn.close()
 
@@ -390,11 +409,54 @@ def get_upcoming_and_expired_food(days=7):
     return sorted(upcoming, key=lambda x: x['expiry_date']), sorted(expired, key=lambda x: x['expiry_date'])
 
 
+def get_leaderboard(period='month', start_date=None, end_date=None):
+    """Get user leaderboard for a specific time period"""
+    with sql.connect(os.getenv("DB_PATH")) as conn:
+        c = conn.cursor()
+        
+        if period == 'month':
+            # Current month
+            today = datetime.now()
+            start_date = today.replace(day=1).strftime('%Y-%m-%d 00:00:00')
+            end_date = (today.replace(day=28) + timedelta(days=4)).replace(day=1).strftime('%Y-%m-%d 00:00:00')
+            c.execute('''SELECT users.username, SUM(chore_completions.points_earned) as total_points, 
+                         COUNT(chore_completions.id) as completions
+                         FROM users 
+                         LEFT JOIN chore_completions ON users.id = chore_completions.user_id
+                         WHERE chore_completions.completed_at >= ? AND chore_completions.completed_at < ?
+                         GROUP BY users.id, users.username
+                         ORDER BY total_points DESC''', (start_date, end_date))
+        elif period == 'all':
+            # All time
+            c.execute('''SELECT users.username, users.points as total_points, 
+                         COUNT(chore_completions.id) as completions
+                         FROM users 
+                         LEFT JOIN chore_completions ON users.id = chore_completions.user_id
+                         GROUP BY users.id, users.username
+                         ORDER BY total_points DESC''')
+        elif period == 'custom' and start_date and end_date:
+            # Custom range
+            c.execute('''SELECT users.username, SUM(chore_completions.points_earned) as total_points, 
+                         COUNT(chore_completions.id) as completions
+                         FROM users 
+                         LEFT JOIN chore_completions ON users.id = chore_completions.user_id
+                         WHERE chore_completions.completed_at >= ? AND chore_completions.completed_at <= ?
+                         GROUP BY users.id, users.username
+                         ORDER BY total_points DESC''', (start_date, end_date))
+        else:
+            return []
+        
+        results = c.fetchall()
+    
+    return [{'username': r[0], 'points': r[1] or 0, 'completions': r[2]} for r in results]
+
+
 @app.route('/')
 def index():
     """Dashboard showing upcoming chores and food items"""
     upcoming_chores = get_upcoming_chores(days=7)
     upcoming_food, expired_food = get_upcoming_and_expired_food(days=7)
+    leaderboard = get_leaderboard(period='month')
     
     # Count overdue chores
     today = datetime.now().date()
@@ -406,6 +468,7 @@ def index():
                          overdue_chores_count=len(overdue_chores),
                          upcoming_food=upcoming_food,
                          expired_food=expired_food,
+                         leaderboard=leaderboard,
                          today=datetime.now())
 
 
@@ -744,6 +807,7 @@ def room_detail(room_id):
             'repeat_days': chore[4],
             'last_completed': chore[5],
             'next_due': chore[6],
+            'points': chore[7] if len(chore) > 7 else 5,
             'is_overdue': False
         }
         if chore[6]:
@@ -771,12 +835,13 @@ def add_chore(room_id):
         name = form.name.data
         description = form.description.data
         repeat_days = form.repeat_days.data
+        points = form.points.data
         next_due = datetime.now().date().strftime('%Y-%m-%d')
         
         with sql.connect(os.getenv("DB_PATH")) as conn:
             c = conn.cursor()
-            c.execute('INSERT INTO chores (room_id, name, description, repeat_days, next_due) VALUES (?, ?, ?, ?, ?)',
-                     (room_id, name, description, repeat_days, next_due))
+            c.execute('INSERT INTO chores (room_id, name, description, repeat_days, next_due, points) VALUES (?, ?, ?, ?, ?, ?)',
+                     (room_id, name, description, repeat_days, next_due, points))
             conn.commit()
         flash('Chore created successfully.', 'success')
         return redirect(url_for('room_detail', room_id=room_id))
@@ -789,7 +854,7 @@ def add_chore(room_id):
 def complete_chore(chore_id):
     with sql.connect(os.getenv("DB_PATH")) as conn:
         c = conn.cursor()
-        c.execute('SELECT room_id, repeat_days FROM chores WHERE id = ?', (chore_id,))
+        c.execute('SELECT room_id, repeat_days, next_due, points FROM chores WHERE id = ?', (chore_id,))
         chore = c.fetchone()
         if chore is None:
             flash('Chore not found.', 'error')
@@ -797,14 +862,57 @@ def complete_chore(chore_id):
         
         room_id = chore[0]
         repeat_days = chore[1]
-        today = datetime.now().date()
-        next_due = (today + timedelta(days=repeat_days)).strftime('%Y-%m-%d')
+        next_due_str = chore[2]
+        max_points = chore[3] if chore[3] else 5
         
+        today = datetime.now().date()
+        
+        # Calculate points based on completion timing
+        if next_due_str:
+            due_date = datetime.strptime(next_due_str, '%Y-%m-%d').date()
+            days_early = (due_date - today).days
+            
+            if days_early == 0:
+                # Completed on due date - full points
+                points_earned = max_points
+            elif days_early < 0:
+                # Completed after due date - still full points (better late than never)
+                points_earned = max_points
+            else:
+                # Completed early - reduce points
+                # Calculate percentage: more days early = lower percentage
+                # 1 day early = 75%, 2 days = 50%, 3+ days = 25%
+                if days_early == 1:
+                    percentage = 0.75
+                elif days_early == 2:
+                    percentage = 0.5
+                else:
+                    percentage = 0.25
+                
+                points_earned = max_points * percentage
+                # Round to nearest 0.25
+                points_earned = round(points_earned * 4) / 4
+        else:
+            # No due date set, give full points
+            points_earned = max_points
+        
+        new_next_due = (today + timedelta(days=repeat_days)).strftime('%Y-%m-%d')
+        
+        # Update chore
         c.execute('UPDATE chores SET last_completed = ?, next_due = ? WHERE id = ?',
-                 (today.strftime('%Y-%m-%d'), next_due, chore_id))
+                 (today.strftime('%Y-%m-%d'), new_next_due, chore_id))
+        
+        # Award points to user
+        c.execute('UPDATE users SET points = points + ? WHERE id = ?', 
+                 (points_earned, current_user.id))
+        
+        # Record completion
+        c.execute('INSERT INTO chore_completions (chore_id, user_id, points_earned) VALUES (?, ?, ?)',
+                 (chore_id, current_user.id, points_earned))
+        
         conn.commit()
     
-    flash('Chore marked as complete!', 'success')
+    flash(f'Chore marked as complete! You earned {points_earned} points!', 'success')
     return redirect(url_for('room_detail', room_id=room_id))
 
 
@@ -835,6 +943,24 @@ def delete_room(room_id):
         conn.commit()
     flash('Room and all associated chores deleted successfully.', 'success')
     return redirect(url_for('chores_list'))
+
+
+@app.route('/leaderboard')
+def leaderboard():
+    """View leaderboard with different time periods"""
+    period = request.args.get('period', 'month')
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+    
+    if period == 'custom' and start_date and end_date:
+        leaders = get_leaderboard(period='custom', start_date=start_date, end_date=end_date)
+    elif period == 'all':
+        leaders = get_leaderboard(period='all')
+    else:
+        leaders = get_leaderboard(period='month')
+    
+    return render_template('leaderboard.html', leaderboard=leaders, period=period,
+                         start_date=start_date, end_date=end_date)
 
 
 # Error handlers
