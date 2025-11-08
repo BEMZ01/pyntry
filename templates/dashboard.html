@@ -1,0 +1,150 @@
+{% extends "layout.html" %}
+{% block body %}
+<div id="wrapper">
+    <div class="d-flex flex-column" id="content-wrapper">
+        <div id="content">
+            <div class="container-fluid">
+                <div class="d-sm-flex justify-content-between align-items-center mb-4">
+                    <h3 class="text-dark mb-0">Pyntry Dashboard</h3>
+                    {% if current_user.is_authenticated %}
+                        <div>
+                            <p class="mb-2 text-center">Logged in as {{ current_user.username }}.</p>
+                            <p class="mb-2 text-center">
+                                <a href="{{ url_for('items_list') }}" class="text-blue-500 hover:underline">View All Items</a> | 
+                                <a href="{{ url_for('chores_list') }}" class="text-blue-500 hover:underline">Manage Chores</a> | 
+                                <a href="{{ url_for('logout') }}" class="text-blue-500 hover:underline">Logout</a>
+                            </p>
+                            <p class="mb-2 text-center"><a href="{{ url_for('register') }}" class="text-blue-500 hover:underline">Register a new user</a></p>
+                        </div>
+                    {% else %}
+                        <p class="mb-2 text-center"><a href="{{ url_for('login') }}" class="text-blue-500 hover:underline">Login</a></p>
+                    {% endif %}
+                </div>
+
+                <!-- Chores Section -->
+                <div class="row">
+                    <div class="col-lg-6 mb-4">
+                        <div class="card shadow">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h6 class="text-primary fw-bold m-0">
+                                    Upcoming Chores
+                                    {% if overdue_chores_count > 0 %}
+                                        <span class="badge bg-danger">{{ overdue_chores_count }} overdue</span>
+                                    {% endif %}
+                                </h6>
+                                {% if current_user.is_authenticated %}
+                                    <a class="btn btn-primary btn-sm" href="{{ url_for('chores_list') }}">Manage Chores</a>
+                                {% endif %}
+                            </div>
+                            <div class="card-body">
+                                {% if upcoming_chores %}
+                                    <div class="list-group">
+                                        {% for chore in upcoming_chores[:5] %}
+                                            <div class="list-group-item">
+                                                <div class="d-flex justify-content-between align-items-center">
+                                                    <div>
+                                                        <h6 class="mb-1">{{ chore.name }}</h6>
+                                                        <small class="text-muted">{{ chore.room_name }}</small>
+                                                        {% if chore.next_due %}
+                                                            {% set due_date = chore.next_due | string %}
+                                                            {% set is_overdue = (today.strftime("%Y-%m-%d") > due_date) %}
+                                                            <p class="mb-0 {% if is_overdue %}text-danger fw-bold{% endif %}">
+                                                                Due: {{ chore.next_due }}
+                                                                {% if is_overdue %}<strong>(OVERDUE)</strong>{% endif %}
+                                                            </p>
+                                                        {% else %}
+                                                            <p class="mb-0 text-muted">No due date set</p>
+                                                        {% endif %}
+                                                    </div>
+                                                    {% if current_user.is_authenticated %}
+                                                        <form action="{{ url_for('complete_chore', chore_id=chore.id) }}" method="post">
+                                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                                            <button type="submit" class="btn btn-success btn-sm">Complete</button>
+                                                        </form>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                    {% if upcoming_chores|length > 5 %}
+                                        <div class="mt-3 text-center">
+                                            <a href="{{ url_for('chores_list') }}" class="btn btn-sm btn-outline-primary">View All Chores</a>
+                                        </div>
+                                    {% endif %}
+                                {% else %}
+                                    <p class="text-muted">No upcoming chores. 
+                                        {% if current_user.is_authenticated %}
+                                            <a href="{{ url_for('chores_list') }}">Create your first chore!</a>
+                                        {% endif %}
+                                    </p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Food Section -->
+                    <div class="col-lg-6 mb-4">
+                        <div class="card shadow">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h6 class="text-primary fw-bold m-0">
+                                    Food Items
+                                    {% if expired_food|length > 0 %}
+                                        <span class="badge bg-danger">{{ expired_food|length }} expired</span>
+                                    {% endif %}
+                                </h6>
+                                {% if current_user.is_authenticated %}
+                                    <a class="btn btn-primary btn-sm" href="{{ url_for('items_list') }}">View All Items</a>
+                                {% endif %}
+                            </div>
+                            <div class="card-body">
+                                {% if expired_food %}
+                                    <h6 class="text-danger">Expired Items</h6>
+                                    <div class="list-group mb-3">
+                                        {% for item in expired_food[:3] %}
+                                            <div class="list-group-item list-group-item-danger">
+                                                <div class="d-flex justify-content-between align-items-center">
+                                                    <div>
+                                                        <h6 class="mb-1">{{ item.name }}</h6>
+                                                        <small>Expired: {{ item.expiry_date }} ({{ item.expire_type }})</small>
+                                                    </div>
+                                                    <span class="badge bg-danger">Qty: {{ item.quantity }}</span>
+                                                </div>
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+
+                                {% if upcoming_food %}
+                                    <h6 class="text-warning">Expiring Soon (Next 7 Days)</h6>
+                                    <div class="list-group">
+                                        {% for item in upcoming_food[:3] %}
+                                            <div class="list-group-item list-group-item-warning">
+                                                <div class="d-flex justify-content-between align-items-center">
+                                                    <div>
+                                                        <h6 class="mb-1">{{ item.name }}</h6>
+                                                        <small>Expires: {{ item.expiry_date }} ({{ item.expire_type }})</small>
+                                                    </div>
+                                                    <span class="badge bg-warning text-dark">Qty: {{ item.quantity }}</span>
+                                                </div>
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+
+                                {% if not expired_food and not upcoming_food %}
+                                    <p class="text-muted">No expiring or expired food items. 
+                                        {% if current_user.is_authenticated %}
+                                            <a href="{{ url_for('add_item') }}">Add your first item!</a>
+                                        {% endif %}
+                                    </p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <a class="border rounded d-inline scroll-to-top" href="#wrapper"><i class="fas fa-angle-up"></i></a>
+</div>
+{% endblock %}
