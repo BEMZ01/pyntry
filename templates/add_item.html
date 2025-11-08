@@ -77,7 +77,7 @@ function handleBarcodeChange(barcode) {
                 let img = document.createElement('img');
                 if (data.image_url) {
                     scannerInfo.innerText += '\n - Already in database!';
-                    scannerInfo.innerHTML += `<br><a href="{{ url_for('edit', id='') }}${data.id}">Edit item</a>`;
+                    scannerInfo.innerHTML += `<br><a href="/edit/${data.id}">Edit item</a>`;
                     img.src = data.image_url;
                 } else {
                     scannerInfo.innerText += '\n - Not in database!';

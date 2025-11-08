@@ -1,0 +1,41 @@
+{% extends "layout.html" %}
+{% block body %}
+<div id="wrapper">
+    <div class="d-flex flex-column" id="content-wrapper">
+        <div id="content">
+            <div class="container-fluid">
+                <div class="d-sm-flex justify-content-between align-items-center mb-4">
+                    <h3 class="text-dark mb-0">Add Room</h3>
+                    <a href="{{ url_for('chores_list') }}" class="btn btn-secondary">Back to Rooms</a>
+                </div>
+
+                <div class="row">
+                    <div class="col-lg-6">
+                        <div class="card shadow">
+                            <div class="card-body">
+                                <form method="POST">
+                                    {{ form.hidden_tag() }}
+                                    <div class="mb-3">
+                                        {{ form.name.label(class="form-label") }}
+                                        {{ form.name(class="form-control", placeholder="e.g., Bathroom, Kitchen, Bedroom") }}
+                                        {% if form.name.errors %}
+                                            <div class="text-danger">
+                                                {% for error in form.name.errors %}
+                                                    <small>{{ error }}</small>
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                    <button type="submit" class="btn btn-primary">Create Room</button>
+                                    <a href="{{ url_for('chores_list') }}" class="btn btn-secondary">Cancel</a>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <a class="border rounded d-inline scroll-to-top" href="#wrapper"><i class="fas fa-angle-up"></i></a>
+</div>
+{% endblock %}
