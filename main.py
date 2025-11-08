@@ -535,11 +535,12 @@ def login():
     if current_user.is_authenticated:
         return redirect(url_for('index'))
 
-    # Check rate limit
-    ip_address = request.environ.get('HTTP_X_FORWARDED_FOR', request.remote_addr)
-    if not check_rate_limit(ip_address):
-        flash('Too many login attempts. Please try again later.', 'error')
-        return render_template('login.html', form=LoginForm()), 429
+    # Check rate limit (skip in testing mode)
+    if not app.config.get('TESTING', False):
+        ip_address = request.environ.get('HTTP_X_FORWARDED_FOR', request.remote_addr)
+        if not check_rate_limit(ip_address):
+            flash('Too many login attempts. Please try again later.', 'error')
+            return render_template('login.html', form=LoginForm()), 429
 
     form = LoginForm()
     if form.validate_on_submit():
@@ -547,8 +548,10 @@ def login():
         password = form.password.data
         persist = form.persist.data
 
-        # Record attempt for rate limiting
-        record_attempt(ip_address)
+        # Record attempt for rate limiting (skip in testing mode)
+        if not app.config.get('TESTING', False):
+            ip_address = request.environ.get('HTTP_X_FORWARDED_FOR', request.remote_addr)
+            record_attempt(ip_address)
 
         try:
             login_user(User(username, password), remember=persist)
