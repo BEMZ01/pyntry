@@ -142,6 +142,52 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Leaderboard Section -->
+                <div class="row">
+                    <div class="col-12 mb-4">
+                        <div class="card shadow">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h6 class="text-primary fw-bold m-0">🏆 Leaderboard - This Month</h6>
+                                <a class="btn btn-sm btn-outline-primary" href="{{ url_for('leaderboard') }}">View All Time</a>
+                            </div>
+                            <div class="card-body">
+                                {% if leaderboard %}
+                                    <div class="table-responsive">
+                                        <table class="table table-hover">
+                                            <thead>
+                                                <tr>
+                                                    <th>Rank</th>
+                                                    <th>User</th>
+                                                    <th>Points</th>
+                                                    <th>Chores Completed</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for leader in leaderboard[:10] %}
+                                                    <tr {% if current_user.is_authenticated and leader.username == current_user.username %}class="table-success"{% endif %}>
+                                                        <td>
+                                                            {% if loop.index == 1 %}🥇
+                                                            {% elif loop.index == 2 %}🥈
+                                                            {% elif loop.index == 3 %}🥉
+                                                            {% else %}{{ loop.index }}
+                                                            {% endif %}
+                                                        </td>
+                                                        <td>{{ leader.username }}</td>
+                                                        <td><strong>{{ leader.points }}</strong></td>
+                                                        <td>{{ leader.completions }}</td>
+                                                    </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                {% else %}
+                                    <p class="text-muted">No activity this month. Complete some chores to get on the leaderboard!</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>

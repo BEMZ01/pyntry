@@ -49,6 +49,18 @@
                                         {% endif %}
                                         <small class="form-text text-muted">How often should this chore repeat? (e.g., 7 for weekly, 14 for bi-weekly)</small>
                                     </div>
+                                    <div class="mb-3">
+                                        {{ form.points.label(class="form-label") }}
+                                        {{ form.points(class="form-control") }}
+                                        {% if form.points.errors %}
+                                            <div class="text-danger">
+                                                {% for error in form.points.errors %}
+                                                    <small>{{ error }}</small>
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                        <small class="form-text text-muted">Full points awarded when completed on due date. Early completion gets reduced points.</small>
+                                    </div>
                                     <button type="submit" class="btn btn-primary">Create Chore</button>
                                     <a href="{{ url_for('room_detail', room_id=room.id) }}" class="btn btn-secondary">Cancel</a>
                                 </form>
