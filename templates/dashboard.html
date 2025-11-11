@@ -86,11 +86,7 @@
                                 {% if upcoming_chores %}
                                     <div class="list-group list-group-flush">
                                         {% for chore in upcoming_chores[:5] %}
-                                            {% set due_date = chore.next_due | string %}
-                                            {% set is_overdue = (today.strftime("%Y-%m-%d") > due_date) %}
-                                            {% set days_until_due = ((due_date | strptime('%Y-%m-%d')).date() - today.date()).days if chore.next_due else 999 %}
-                                            
-                                            <div class="chore-item {% if is_overdue %}overdue{% elif days_until_due <= 1 %}due-soon{% else %}on-track{% endif %}">
+                                            <div class="chore-item {% if chore.is_overdue %}overdue{% elif chore.days_until_due <= 1 %}due-soon{% else %}on-track{% endif %}">
                                                 <div class="d-flex justify-content-between align-items-start">
                                                     <div class="flex-grow-1">
                                                         <h6 class="mb-1">{{ chore.name }}</h6>
@@ -98,13 +94,13 @@
                                                             <i class="fas fa-door-open"></i> {{ chore.room_name }}
                                                         </small>
                                                         {% if chore.next_due %}
-                                                            <p class="mb-0 mt-1 {% if is_overdue %}text-danger fw-bold{% endif %}">
+                                                            <p class="mb-0 mt-1 {% if chore.is_overdue %}text-danger fw-bold{% endif %}">
                                                                 <i class="fas fa-calendar"></i> 
-                                                                {% if is_overdue %}
+                                                                {% if chore.is_overdue %}
                                                                     <strong>OVERDUE</strong> ({{ chore.next_due }})
-                                                                {% elif days_until_due == 0 %}
+                                                                {% elif chore.days_until_due == 0 %}
                                                                     <strong>Due today!</strong>
-                                                                {% elif days_until_due == 1 %}
+                                                                {% elif chore.days_until_due == 1 %}
                                                                     Due tomorrow
                                                                 {% else %}
                                                                     Due {{ chore.next_due }}
