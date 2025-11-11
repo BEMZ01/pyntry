@@ -83,7 +83,7 @@
                                         </div>
                                     </div>
                                     
-                                    <button type="submit" class="btn btn-tody btn-tody-primary">
+                                    <button type="submit" class="btn btn-chore btn-chore-primary">
                                         <i class="fas fa-plus"></i> Create Room
                                     </button>
                                     <a href="{{ url_for('chores_list') }}" class="btn btn-outline-secondary">Cancel</a>
@@ -100,21 +100,38 @@
 <script>
 function selectTemplate(templateName) {
     document.getElementById('templateSelect').value = templateName;
+    // Disable required fields when using template
+    const nameField = document.querySelector('input[name="name"]');
+    const colorField = document.querySelector('input[name="color"]');
+    const iconField = document.querySelector('input[name="icon"]');
+    if (nameField) nameField.required = false;
+    if (colorField) colorField.required = false;
+    if (iconField) iconField.required = false;
     document.getElementById('customFields').style.display = 'none';
     document.getElementById('roomForm').submit();
 }
 
 document.getElementById('templateSelect').addEventListener('change', function() {
     const customFields = document.getElementById('customFields');
+    const nameField = document.querySelector('input[name="name"]');
+    const colorField = document.querySelector('input[name="color"]');
+    const iconField = document.querySelector('input[name="icon"]');
+    
     if (this.value === '') {
         customFields.style.display = 'block';
+        if (nameField) nameField.required = true;
     } else {
         customFields.style.display = 'none';
+        if (nameField) nameField.required = false;
+        if (colorField) colorField.required = false;
+        if (iconField) iconField.required = false;
     }
 });
 
 // Initialize on page load
 if (document.getElementById('templateSelect').value !== '') {
+    const nameField = document.querySelector('input[name="name"]');
+    if (nameField) nameField.required = false;
     document.getElementById('customFields').style.display = 'none';
 }
 </script>

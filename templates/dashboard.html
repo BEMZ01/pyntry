@@ -20,8 +20,8 @@
                 <div class="mascot-race">
                     <div class="row align-items-center mb-3">
                         <div class="col-md-8">
-                            <h5 class="mb-0">🏁 Race Against Tidy the Mascot!</h5>
-                            <p class="mb-0 mt-2" style="opacity: 0.9;">Complete chores to earn points and beat Tidy! 🎯</p>
+                            <h5 class="mb-0">🏁 Race Against Buddy the Mascot!</h5>
+                            <p class="mb-0 mt-2" style="opacity: 0.9;">Complete chores to earn points and beat Buddy! 🎯</p>
                         </div>
                         <div class="col-md-4 text-end">
                             <div class="d-flex justify-content-end align-items-center gap-3">
@@ -36,7 +36,7 @@
                                     <div class="mascot-avatar" style="width: 60px; height: 60px; font-size: 2rem; background: linear-gradient(135deg, #FFD700, #FFA500);">
                                         🐰
                                     </div>
-                                    <small class="d-block mt-1">Tidy</small>
+                                    <small class="d-block mt-1">Buddy</small>
                                     <strong>{{ mascot_points|int }}</strong>
                                 </div>
                             </div>
@@ -57,13 +57,13 @@
                     {% elif user_points == mascot_points %}
                         <p class="text-center mb-0 mt-2">🤝 It's a tie! Complete a chore to take the lead!</p>
                     {% else %}
-                        <p class="text-center mb-0 mt-2">💪 Tidy is ahead! Complete some chores to catch up!</p>
+                        <p class="text-center mb-0 mt-2">💪 Buddy is ahead! Complete some chores to catch up!</p>
                     {% endif %}
                 </div>
                 {% else %}
                 <!-- Guest motivation -->
                 <div class="motivation-box">
-                    🎉 Welcome to Pyntry! <a href="{{ url_for('login') }}" style="color: white; text-decoration: underline;">Login</a> to start tracking your chores and compete with Tidy the mascot!
+                    🎉 Welcome to Pyntry! <a href="{{ url_for('login') }}" style="color: white; text-decoration: underline;">Login</a> to start tracking your chores and compete with Buddy the mascot!
                 </div>
                 {% endif %}
 
@@ -75,11 +75,11 @@
                                 <h6 class="text-primary fw-bold m-0">
                                     📋 Upcoming Chores
                                     {% if overdue_chores_count > 0 %}
-                                        <span class="badge badge-tody badge-overdue ms-2">{{ overdue_chores_count }} overdue</span>
+                                        <span class="badge badge-chore badge-overdue ms-2">{{ overdue_chores_count }} overdue</span>
                                     {% endif %}
                                 </h6>
                                 {% if current_user.is_authenticated %}
-                                    <a class="btn btn-tody btn-tody-primary btn-sm" href="{{ url_for('chores_list') }}">Manage</a>
+                                    <a class="btn btn-chore btn-chore-primary btn-sm" href="{{ url_for('chores_list') }}">Manage</a>
                                 {% endif %}
                             </div>
                             <div class="card-body">
@@ -111,7 +111,7 @@
                                                     {% if current_user.is_authenticated %}
                                                         <form action="{{ url_for('complete_chore', chore_id=chore.id) }}" method="post" class="ms-2">
                                                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                                                            <button type="submit" class="btn btn-tody btn-tody-success btn-sm">
+                                                            <button type="submit" class="btn btn-chore btn-chore-success btn-sm">
                                                                 <i class="fas fa-check"></i>
                                                             </button>
                                                         </form>
@@ -143,11 +143,11 @@
                                 <h6 class="text-primary fw-bold m-0">
                                     🍎 Food Items
                                     {% if expired_food|length > 0 %}
-                                        <span class="badge badge-tody badge-overdue ms-2">{{ expired_food|length }} expired</span>
+                                        <span class="badge badge-chore badge-overdue ms-2">{{ expired_food|length }} expired</span>
                                     {% endif %}
                                 </h6>
                                 {% if current_user.is_authenticated %}
-                                    <a class="btn btn-tody btn-tody-primary btn-sm" href="{{ url_for('items_list') }}">View All</a>
+                                    <a class="btn btn-chore btn-chore-primary btn-sm" href="{{ url_for('items_list') }}">View All</a>
                                 {% endif %}
                             </div>
                             <div class="card-body">
@@ -161,7 +161,7 @@
                                                         <h6 class="mb-1">{{ item.name }}</h6>
                                                         <small class="text-danger">Expired: {{ item.expiry_date }}</small>
                                                     </div>
-                                                    <span class="badge badge-tody badge-overdue">Qty: {{ item.quantity }}</span>
+                                                    <span class="badge badge-chore badge-overdue">Qty: {{ item.quantity }}</span>
                                                 </div>
                                             </div>
                                         {% endfor %}
@@ -178,7 +178,7 @@
                                                         <h6 class="mb-1">{{ item.name }}</h6>
                                                         <small>Expires: {{ item.expiry_date }}</small>
                                                     </div>
-                                                    <span class="badge badge-tody badge-due-soon">Qty: {{ item.quantity }}</span>
+                                                    <span class="badge badge-chore badge-due-soon">Qty: {{ item.quantity }}</span>
                                                 </div>
                                             </div>
                                         {% endfor %}

@@ -89,7 +89,7 @@ ROOM_TEMPLATES = {
         'chores': [
             {'name': 'Dust', 'description': 'Dust all surfaces and shelves', 'repeat_days': 7, 'points': 5},
             {'name': 'Vacuum floor', 'description': 'Vacuum carpet or sweep floor', 'repeat_days': 5, 'points': 5},
-            {'name': 'Organize items', 'description': 'Tidy up and organize living room items', 'repeat_days': 3, 'points': 3}
+            {'name': 'Organize items', 'description': 'Organize and declutter living room items', 'repeat_days': 3, 'points': 3}
         ]
     },
     'Office': {

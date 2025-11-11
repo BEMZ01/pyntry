@@ -10,7 +10,7 @@
                         <a href="{{ url_for('index') }}" class="btn btn-sm btn-outline-primary me-2">
                             <i class="fas fa-home"></i> Dashboard
                         </a>
-                        <a class="btn btn-tody btn-tody-primary" href="{{ url_for('add_room') }}">
+                        <a class="btn btn-chore btn-chore-primary" href="{{ url_for('add_room') }}">
                             <i class="fas fa-plus"></i> Add Room
                         </a>
                     </div>
@@ -30,12 +30,12 @@
                                             <small style="opacity: 0.9;">{{ room.chore_count }} chore(s)</small>
                                         </div>
                                         {% if room.overdue_count > 0 %}
-                                            <span class="badge badge-tody badge-overdue">{{ room.overdue_count }} overdue</span>
+                                            <span class="badge badge-chore badge-overdue">{{ room.overdue_count }} overdue</span>
                                         {% endif %}
                                     </div>
                                     <div class="room-card-body">
                                         <div class="d-flex justify-content-between gap-2">
-                                            <a href="{{ url_for('room_detail', room_id=room.id) }}" class="btn btn-tody btn-tody-primary flex-grow-1">
+                                            <a href="{{ url_for('room_detail', room_id=room.id) }}" class="btn btn-chore btn-chore-primary flex-grow-1">
                                                 <i class="fas fa-tasks"></i> View Chores
                                             </a>
                                             <a href="{{ url_for('delete_room', room_id=room.id) }}" class="btn btn-outline-danger" 
