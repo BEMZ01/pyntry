@@ -1,0 +1,323 @@
+/* Tody-inspired styling */
+
+:root {
+    --primary-blue: #4A90E2;
+    --light-blue: #63B3ED;
+    --teal: #38B2AC;
+    --green: #48BB78;
+    --light-green: #68D391;
+    --purple: #9F7AEA;
+    --purple-blue: #667EEA;
+    
+    --progress-green: #48BB78;
+    --progress-yellow: #ECC94B;
+    --progress-orange: #ED8936;
+    --progress-red: #F56565;
+    
+    --bg-gray: #F7FAFC;
+    --border-gray: #E2E8F0;
+    --text-gray: #718096;
+    --text-dark: #2D3748;
+}
+
+body {
+    background-color: var(--bg-gray);
+    font-family: 'Nunito', sans-serif;
+    color: var(--text-dark);
+}
+
+/* Room Cards - Tody Style */
+.room-card {
+    border-radius: 16px;
+    overflow: hidden;
+    transition: transform 0.2s, box-shadow 0.2s;
+    border: none;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.room-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+.room-card-header {
+    padding: 20px;
+    color: white;
+    font-weight: 600;
+    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.room-card-body {
+    padding: 20px;
+    background: white;
+}
+
+.room-icon {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 10px;
+    font-size: 1.3rem;
+}
+
+/* Progress Bars */
+.progress-bar-tody {
+    height: 8px;
+    border-radius: 10px;
+    overflow: hidden;
+    background: var(--border-gray);
+    margin: 8px 0;
+}
+
+.progress-fill {
+    height: 100%;
+    border-radius: 10px;
+    transition: width 0.3s ease;
+}
+
+.progress-green { background: var(--progress-green); }
+.progress-yellow { background: var(--progress-yellow); }
+.progress-orange { background: var(--progress-orange); }
+.progress-red { background: var(--progress-red); }
+
+/* Mascot Race Section */
+.mascot-race {
+    background: linear-gradient(135deg, #667EEA 0%, #764BA2 100%);
+    border-radius: 16px;
+    padding: 24px;
+    color: white;
+    box-shadow: 0 4px 16px rgba(102, 126, 234, 0.3);
+    margin-bottom: 24px;
+}
+
+.mascot-avatar {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.5rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.race-track {
+    position: relative;
+    height: 60px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 30px;
+    margin: 16px 0;
+    overflow: hidden;
+}
+
+.race-participant {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    transition: left 0.5s ease;
+}
+
+.race-user {
+    left: var(--user-progress, 0%);
+}
+
+.race-mascot {
+    left: var(--mascot-progress, 0%);
+}
+
+.participant-avatar {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* Chore List Items */
+.chore-item {
+    border-left: 4px solid transparent;
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 8px;
+    background: white;
+    transition: background 0.2s;
+}
+
+.chore-item:hover {
+    background: #F7FAFC;
+}
+
+.chore-item.overdue {
+    border-left-color: var(--progress-red);
+    background: #FFF5F5;
+}
+
+.chore-item.due-soon {
+    border-left-color: var(--progress-yellow);
+    background: #FFFFF0;
+}
+
+.chore-item.on-track {
+    border-left-color: var(--progress-green);
+}
+
+/* Badges */
+.badge-tody {
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.badge-overdue {
+    background: var(--progress-red);
+    color: white;
+}
+
+.badge-due-soon {
+    background: var(--progress-yellow);
+    color: var(--text-dark);
+}
+
+.badge-on-track {
+    background: var(--progress-green);
+    color: white;
+}
+
+/* Buttons */
+.btn-tody {
+    border-radius: 12px;
+    padding: 10px 24px;
+    font-weight: 600;
+    border: none;
+    transition: all 0.2s;
+}
+
+.btn-tody-primary {
+    background: var(--primary-blue);
+    color: white;
+}
+
+.btn-tody-primary:hover {
+    background: #3A7BC8;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(74, 144, 226, 0.3);
+}
+
+.btn-tody-success {
+    background: var(--progress-green);
+    color: white;
+}
+
+.btn-tody-success:hover {
+    background: #38A169;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(72, 187, 120, 0.3);
+}
+
+/* Bottom Navigation */
+.bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: white;
+    box-shadow: 0 -2px 16px rgba(0, 0, 0, 0.1);
+    z-index: 1000;
+    display: flex;
+    justify-content: space-around;
+    padding: 12px 0;
+}
+
+.bottom-nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    color: var(--text-gray);
+    text-decoration: none;
+    padding: 8px 20px;
+    transition: color 0.2s;
+}
+
+.bottom-nav-item:hover,
+.bottom-nav-item.active {
+    color: var(--primary-blue);
+}
+
+.bottom-nav-item i {
+    font-size: 1.5rem;
+}
+
+.bottom-nav-item span {
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+/* Content padding to account for bottom nav */
+.content-with-nav {
+    padding-bottom: 80px;
+}
+
+/* Motivational Messages */
+.motivation-box {
+    background: linear-gradient(135deg, #48BB78 0%, #38B2AC 100%);
+    border-radius: 12px;
+    padding: 16px 20px;
+    color: white;
+    font-size: 1.1rem;
+    font-weight: 600;
+    text-align: center;
+    box-shadow: 0 2px 8px rgba(72, 187, 120, 0.3);
+    margin-bottom: 20px;
+}
+
+/* Stat Cards */
+.stat-card {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.stat-number {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--primary-blue);
+}
+
+.stat-label {
+    color: var(--text-gray);
+    font-size: 0.9rem;
+    margin-top: 4px;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .room-card-header {
+        font-size: 1rem;
+        padding: 16px;
+    }
+    
+    .mascot-avatar {
+        width: 60px;
+        height: 60px;
+        font-size: 2rem;
+    }
+    
+    .mascot-race {
+        padding: 16px;
+    }
+}

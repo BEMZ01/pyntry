@@ -1,33 +1,92 @@
 {% extends "layout.html" %}
 {% block body %}
-<div id="wrapper">
+<div id="wrapper" class="content-with-nav">
     <div class="d-flex flex-column" id="content-wrapper">
         <div id="content">
             <div class="container-fluid">
                 <div class="d-sm-flex justify-content-between align-items-center mb-4">
-                    <h3 class="text-dark mb-0">Add Room</h3>
-                    <a href="{{ url_for('chores_list') }}" class="btn btn-secondary">Back to Rooms</a>
+                    <h3 class="text-dark mb-0">✨ Add Room</h3>
+                    <a href="{{ url_for('chores_list') }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left"></i> Back to Rooms
+                    </a>
                 </div>
 
                 <div class="row">
-                    <div class="col-lg-6">
-                        <div class="card shadow">
-                            <div class="card-body">
-                                <form method="POST">
-                                    {{ form.hidden_tag() }}
-                                    <div class="mb-3">
-                                        {{ form.name.label(class="form-label") }}
-                                        {{ form.name(class="form-control", placeholder="e.g., Bathroom, Kitchen, Bedroom") }}
-                                        {% if form.name.errors %}
-                                            <div class="text-danger">
-                                                {% for error in form.name.errors %}
-                                                    <small>{{ error }}</small>
-                                                {% endfor %}
+                    <div class="col-lg-8">
+                        <!-- Quick Templates Section -->
+                        <div class="motivation-box mb-4">
+                            💡 Quick Start: Choose a template room with pre-configured chores!
+                        </div>
+                        
+                        <div class="row mb-4">
+                            <h5 class="mb-3">📋 Room Templates</h5>
+                            {% for template_name, template_data in templates.items() %}
+                                <div class="col-md-6 col-lg-4 mb-3">
+                                    <div class="room-card" style="cursor: pointer;" onclick="selectTemplate('{{ template_name }}')">
+                                        <div class="room-card-header" style="background: {{ template_data.color }};">
+                                            <div class="room-icon">
+                                                <i class="fas fa-{{ template_data.icon }}"></i>
                                             </div>
-                                        {% endif %}
+                                            <div>{{ template_name }}</div>
+                                        </div>
+                                        <div class="room-card-body">
+                                            <small class="text-muted">{{ template_data.chores|length }} chores included</small>
+                                        </div>
                                     </div>
-                                    <button type="submit" class="btn btn-primary">Create Room</button>
-                                    <a href="{{ url_for('chores_list') }}" class="btn btn-secondary">Cancel</a>
+                                </div>
+                            {% endfor %}
+                        </div>
+
+                        <hr class="my-4">
+
+                        <!-- Custom Room Form -->
+                        <div class="card shadow">
+                            <div class="card-header">
+                                <h6 class="m-0">🎨 Custom Room</h6>
+                            </div>
+                            <div class="card-body">
+                                <form method="POST" id="roomForm">
+                                    {{ form.hidden_tag() }}
+                                    
+                                    <div class="mb-3">
+                                        {{ form.use_template.label(class="form-label") }}
+                                        {{ form.use_template(class="form-select", id="templateSelect") }}
+                                    </div>
+                                    
+                                    <div id="customFields">
+                                        <div class="mb-3">
+                                            {{ form.name.label(class="form-label") }}
+                                            {{ form.name(class="form-control", placeholder="e.g., Bathroom, Kitchen, Bedroom") }}
+                                            {% if form.name.errors %}
+                                                <div class="text-danger">
+                                                    {% for error in form.name.errors %}
+                                                        <small>{{ error }}</small>
+                                                    {% endfor %}
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                        
+                                        <div class="row">
+                                            <div class="col-md-6 mb-3">
+                                                {{ form.color.label(class="form-label") }}
+                                                <div class="input-group">
+                                                    {{ form.color(class="form-control", type="color") }}
+                                                    <span class="input-group-text">Pick a color</span>
+                                                </div>
+                                            </div>
+                                            
+                                            <div class="col-md-6 mb-3">
+                                                {{ form.icon.label(class="form-label") }}
+                                                {{ form.icon(class="form-control", placeholder="e.g., home, bed, bath") }}
+                                                <small class="text-muted">FontAwesome icon name</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <button type="submit" class="btn btn-tody btn-tody-primary">
+                                        <i class="fas fa-plus"></i> Create Room
+                                    </button>
+                                    <a href="{{ url_for('chores_list') }}" class="btn btn-outline-secondary">Cancel</a>
                                 </form>
                             </div>
                         </div>
@@ -36,6 +95,49 @@
             </div>
         </div>
     </div>
-    <a class="border rounded d-inline scroll-to-top" href="#wrapper"><i class="fas fa-angle-up"></i></a>
 </div>
+
+<script>
+function selectTemplate(templateName) {
+    document.getElementById('templateSelect').value = templateName;
+    document.getElementById('customFields').style.display = 'none';
+    document.getElementById('roomForm').submit();
+}
+
+document.getElementById('templateSelect').addEventListener('change', function() {
+    const customFields = document.getElementById('customFields');
+    if (this.value === '') {
+        customFields.style.display = 'block';
+    } else {
+        customFields.style.display = 'none';
+    }
+});
+
+// Initialize on page load
+if (document.getElementById('templateSelect').value !== '') {
+    document.getElementById('customFields').style.display = 'none';
+}
+</script>
+
+<!-- Bottom Navigation -->
+<nav class="bottom-nav">
+    <a href="{{ url_for('index') }}" class="bottom-nav-item">
+        <i class="fas fa-check-circle"></i>
+        <span>Tasks</span>
+    </a>
+    <a href="{{ url_for('chores_list') }}" class="bottom-nav-item active">
+        <i class="fas fa-list"></i>
+        <span>Rooms</span>
+    </a>
+    <a href="{{ url_for('leaderboard') }}" class="bottom-nav-item">
+        <i class="fas fa-trophy"></i>
+        <span>Leaderboard</span>
+    </a>
+    {% if current_user.is_authenticated %}
+        <a href="{{ url_for('items_list') }}" class="bottom-nav-item">
+            <i class="fas fa-box"></i>
+            <span>Items</span>
+        </a>
+    {% endif %}
+</nav>
 {% endblock %}
