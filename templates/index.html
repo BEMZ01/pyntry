@@ -359,14 +359,14 @@ function sortTable(n) {
                                                     <td>
                                                         {%  if current_user.is_authenticated %}
                                                         <div class="row">
-                                                            <div class="col"><a class="btn btn-primary" role="button" style="margin-right: 5px;" href="{{ url_for('edit', id=item.id) }}"><i class="far fa-edit"></i></a><a class="btn btn-danger" role="button" href="{{ url_for('qdelete', id=item.id) }}" style="background: rgb(187,65,13);"><i class="far fa-trash-alt"></i></a></div>
+                                                            <div class="col"><a class="btn btn-primary" role="button" style="margin-right: 5px;" href="{{ url_for('edit', id=item.id) }}"><i class="fas fa-edit"></i></a><a class="btn btn-danger" role="button" href="{{ url_for('qdelete', id=item.id) }}" style="background: rgb(187,65,13);"><i class="fas fa-trash-alt"></i></a></div>
                                                         </div>
                                                         <div class="row">
                                                             <div class="col"><a class="btn btn-primary" role="button" style="margin-right: 5px;" href="{{ url_for('qplus1', id=item.id) }}"><strong>+1</strong></a><a class="btn btn-primary" role="button" href="{{ url_for('qminus1', id=item.id) }}"><strong>-1</strong></a></div>
                                                         </div>
                                                         {% else %}
                                                             <div class="row">
-                                                                <div class="col"><a class="btn btn-primary disabled" role="button" style="margin-right: 5px;" href="#"><i class="far fa-edit"></i></a><a class="btn btn-danger disabled" role="button" href="#" style="background: rgb(187,65,13);"><i class="far fa-trash-alt"></i></a></div>
+                                                                <div class="col"><a class="btn btn-primary disabled" role="button" style="margin-right: 5px;" href="#"><i class="fas fa-edit"></i></a><a class="btn btn-danger disabled" role="button" href="#" style="background: rgb(187,65,13);"><i class="fas fa-trash-alt"></i></a></div>
                                                             </div>
                                                             <div class="row">
                                                                 <div class="col"><a class="btn btn-primary disabled" role="button" style="margin-right: 5px;" href="#"><strong>+1</strong></a><a class="btn btn-primary disabled" role="button" href="#"><strong>-1</strong></a></div>
