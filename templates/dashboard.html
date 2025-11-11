@@ -1,65 +1,119 @@
 {% extends "layout.html" %}
 {% block body %}
-<div id="wrapper">
+<div id="wrapper" class="content-with-nav">
     <div class="d-flex flex-column" id="content-wrapper">
         <div id="content">
             <div class="container-fluid">
                 <div class="d-sm-flex justify-content-between align-items-center mb-4">
-                    <h3 class="text-dark mb-0">Pyntry Dashboard</h3>
+                    <h3 class="text-dark mb-0">✨ Pyntry Dashboard</h3>
                     {% if current_user.is_authenticated %}
                         <div>
-                            <p class="mb-2 text-center">Logged in as {{ current_user.username }}.</p>
-                            <p class="mb-2 text-center">
-                                <a href="{{ url_for('items_list') }}" class="text-blue-500 hover:underline">View All Items</a> | 
-                                <a href="{{ url_for('chores_list') }}" class="text-blue-500 hover:underline">Manage Chores</a> | 
-                                <a href="{{ url_for('logout') }}" class="text-blue-500 hover:underline">Logout</a>
-                            </p>
-                            <p class="mb-2 text-center"><a href="{{ url_for('register') }}" class="text-blue-500 hover:underline">Register a new user</a></p>
+                            <span class="badge bg-primary" style="font-size: 1rem; padding: 8px 16px;">
+                                {{ current_user.username }} • {{ user_points|int }} pts
+                            </span>
                         </div>
-                    {% else %}
-                        <p class="mb-2 text-center"><a href="{{ url_for('login') }}" class="text-blue-500 hover:underline">Login</a></p>
                     {% endif %}
                 </div>
+
+                {% if current_user.is_authenticated %}
+                <!-- Mascot Race Section -->
+                <div class="mascot-race">
+                    <div class="row align-items-center mb-3">
+                        <div class="col-md-8">
+                            <h5 class="mb-0">🏁 Race Against Buddy the Mascot!</h5>
+                            <p class="mb-0 mt-2" style="opacity: 0.9;">Complete chores to earn points and beat Buddy! 🎯</p>
+                        </div>
+                        <div class="col-md-4 text-end">
+                            <div class="d-flex justify-content-end align-items-center gap-3">
+                                <div>
+                                    <div class="mascot-avatar" style="width: 60px; height: 60px; font-size: 2rem;">
+                                        👤
+                                    </div>
+                                    <small class="d-block mt-1">You</small>
+                                    <strong>{{ user_points|int }}</strong>
+                                </div>
+                                <div>
+                                    <div class="mascot-avatar" style="width: 60px; height: 60px; font-size: 2rem; background: linear-gradient(135deg, #FFD700, #FFA500);">
+                                        🐰
+                                    </div>
+                                    <small class="d-block mt-1">Buddy</small>
+                                    <strong>{{ mascot_points|int }}</strong>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="race-track" style="--user-progress: {{ user_progress }}%; --mascot-progress: {{ mascot_progress }}%;">
+                        <div class="race-participant race-user" style="left: {{ user_progress }}%;">
+                            <div class="participant-avatar">👤</div>
+                        </div>
+                        <div class="race-participant race-mascot" style="left: {{ mascot_progress }}%; top: 10px;">
+                            <div class="participant-avatar" style="background: linear-gradient(135deg, #FFD700, #FFA500);">🐰</div>
+                        </div>
+                    </div>
+                    
+                    {% if user_points > mascot_points %}
+                        <p class="text-center mb-0 mt-2">🎉 You're winning! Keep up the great work!</p>
+                    {% elif user_points == mascot_points %}
+                        <p class="text-center mb-0 mt-2">🤝 It's a tie! Complete a chore to take the lead!</p>
+                    {% else %}
+                        <p class="text-center mb-0 mt-2">💪 Buddy is ahead! Complete some chores to catch up!</p>
+                    {% endif %}
+                </div>
+                {% else %}
+                <!-- Guest motivation -->
+                <div class="motivation-box">
+                    🎉 Welcome to Pyntry! <a href="{{ url_for('login') }}" style="color: white; text-decoration: underline;">Login</a> to start tracking your chores and compete with Buddy the mascot!
+                </div>
+                {% endif %}
 
                 <!-- Chores Section -->
                 <div class="row">
                     <div class="col-lg-6 mb-4">
-                        <div class="card shadow">
-                            <div class="card-header d-flex justify-content-between align-items-center">
+                        <div class="card shadow" style="border-radius: 16px; border: none;">
+                            <div class="card-header d-flex justify-content-between align-items-center" style="background: white; border-bottom: 2px solid #E2E8F0;">
                                 <h6 class="text-primary fw-bold m-0">
-                                    Upcoming Chores
+                                    📋 Upcoming Chores
                                     {% if overdue_chores_count > 0 %}
-                                        <span class="badge bg-danger">{{ overdue_chores_count }} overdue</span>
+                                        <span class="badge badge-chore badge-overdue ms-2">{{ overdue_chores_count }} overdue</span>
                                     {% endif %}
                                 </h6>
                                 {% if current_user.is_authenticated %}
-                                    <a class="btn btn-primary btn-sm" href="{{ url_for('chores_list') }}">Manage Chores</a>
+                                    <a class="btn btn-chore btn-chore-primary btn-sm" href="{{ url_for('chores_list') }}">Manage</a>
                                 {% endif %}
                             </div>
                             <div class="card-body">
                                 {% if upcoming_chores %}
-                                    <div class="list-group">
+                                    <div class="list-group list-group-flush">
                                         {% for chore in upcoming_chores[:5] %}
-                                            <div class="list-group-item">
-                                                <div class="d-flex justify-content-between align-items-center">
-                                                    <div>
+                                            <div class="chore-item {% if chore.is_overdue %}overdue{% elif chore.days_until_due <= 1 %}due-soon{% else %}on-track{% endif %}">
+                                                <div class="d-flex justify-content-between align-items-start">
+                                                    <div class="flex-grow-1">
                                                         <h6 class="mb-1">{{ chore.name }}</h6>
-                                                        <small class="text-muted">{{ chore.room_name }}</small>
+                                                        <small class="text-muted">
+                                                            <i class="fas fa-door-open"></i> {{ chore.room_name }}
+                                                        </small>
                                                         {% if chore.next_due %}
-                                                            {% set due_date = chore.next_due | string %}
-                                                            {% set is_overdue = (today.strftime("%Y-%m-%d") > due_date) %}
-                                                            <p class="mb-0 {% if is_overdue %}text-danger fw-bold{% endif %}">
-                                                                Due: {{ chore.next_due }}
-                                                                {% if is_overdue %}<strong>(OVERDUE)</strong>{% endif %}
+                                                            <p class="mb-0 mt-1 {% if chore.is_overdue %}text-danger fw-bold{% endif %}">
+                                                                <i class="fas fa-calendar"></i> 
+                                                                {% if chore.is_overdue %}
+                                                                    <strong>OVERDUE</strong> ({{ chore.next_due }})
+                                                                {% elif chore.days_until_due == 0 %}
+                                                                    <strong>Due today!</strong>
+                                                                {% elif chore.days_until_due == 1 %}
+                                                                    Due tomorrow
+                                                                {% else %}
+                                                                    Due {{ chore.next_due }}
+                                                                {% endif %}
                                                             </p>
-                                                        {% else %}
-                                                            <p class="mb-0 text-muted">No due date set</p>
                                                         {% endif %}
                                                     </div>
                                                     {% if current_user.is_authenticated %}
-                                                        <form action="{{ url_for('complete_chore', chore_id=chore.id) }}" method="post">
+                                                        <form action="{{ url_for('complete_chore', chore_id=chore.id) }}" method="post" class="ms-2">
                                                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                                                            <button type="submit" class="btn btn-success btn-sm">Complete</button>
+                                                            <button type="submit" class="btn btn-chore btn-chore-success btn-sm">
+                                                                <i class="fas fa-check"></i>
+                                                            </button>
                                                         </form>
                                                     {% endif %}
                                                 </div>
@@ -84,30 +138,30 @@
 
                     <!-- Food Section -->
                     <div class="col-lg-6 mb-4">
-                        <div class="card shadow">
-                            <div class="card-header d-flex justify-content-between align-items-center">
+                        <div class="card shadow" style="border-radius: 16px; border: none;">
+                            <div class="card-header d-flex justify-content-between align-items-center" style="background: white; border-bottom: 2px solid #E2E8F0;">
                                 <h6 class="text-primary fw-bold m-0">
-                                    Food Items
+                                    🍎 Food Items
                                     {% if expired_food|length > 0 %}
-                                        <span class="badge bg-danger">{{ expired_food|length }} expired</span>
+                                        <span class="badge badge-chore badge-overdue ms-2">{{ expired_food|length }} expired</span>
                                     {% endif %}
                                 </h6>
                                 {% if current_user.is_authenticated %}
-                                    <a class="btn btn-primary btn-sm" href="{{ url_for('items_list') }}">View All Items</a>
+                                    <a class="btn btn-chore btn-chore-primary btn-sm" href="{{ url_for('items_list') }}">View All</a>
                                 {% endif %}
                             </div>
                             <div class="card-body">
                                 {% if expired_food %}
-                                    <h6 class="text-danger">Expired Items</h6>
-                                    <div class="list-group mb-3">
+                                    <h6 class="text-danger mb-3">⚠️ Expired Items</h6>
+                                    <div class="list-group list-group-flush mb-3">
                                         {% for item in expired_food[:3] %}
-                                            <div class="list-group-item list-group-item-danger">
+                                            <div class="chore-item overdue">
                                                 <div class="d-flex justify-content-between align-items-center">
                                                     <div>
                                                         <h6 class="mb-1">{{ item.name }}</h6>
-                                                        <small>Expired: {{ item.expiry_date }} ({{ item.expire_type }})</small>
+                                                        <small class="text-danger">Expired: {{ item.expiry_date }}</small>
                                                     </div>
-                                                    <span class="badge bg-danger">Qty: {{ item.quantity }}</span>
+                                                    <span class="badge badge-chore badge-overdue">Qty: {{ item.quantity }}</span>
                                                 </div>
                                             </div>
                                         {% endfor %}
@@ -115,16 +169,16 @@
                                 {% endif %}
 
                                 {% if upcoming_food %}
-                                    <h6 class="text-warning">Expiring Soon (Next 7 Days)</h6>
-                                    <div class="list-group">
+                                    <h6 class="text-warning mb-3">⏰ Expiring Soon (Next 7 Days)</h6>
+                                    <div class="list-group list-group-flush">
                                         {% for item in upcoming_food[:3] %}
-                                            <div class="list-group-item list-group-item-warning">
+                                            <div class="chore-item due-soon">
                                                 <div class="d-flex justify-content-between align-items-center">
                                                     <div>
                                                         <h6 class="mb-1">{{ item.name }}</h6>
-                                                        <small>Expires: {{ item.expiry_date }} ({{ item.expire_type }})</small>
+                                                        <small>Expires: {{ item.expiry_date }}</small>
                                                     </div>
-                                                    <span class="badge bg-warning text-dark">Qty: {{ item.quantity }}</span>
+                                                    <span class="badge badge-chore badge-due-soon">Qty: {{ item.quantity }}</span>
                                                 </div>
                                             </div>
                                         {% endfor %}
@@ -146,8 +200,8 @@
                 <!-- Leaderboard Section -->
                 <div class="row">
                     <div class="col-12 mb-4">
-                        <div class="card shadow">
-                            <div class="card-header d-flex justify-content-between align-items-center">
+                        <div class="card shadow" style="border-radius: 16px; border: none;">
+                            <div class="card-header d-flex justify-content-between align-items-center" style="background: white; border-bottom: 2px solid #E2E8F0;">
                                 <h6 class="text-primary fw-bold m-0">🏆 Leaderboard - This Month</h6>
                                 <a class="btn btn-sm btn-outline-primary" href="{{ url_for('leaderboard') }}">View All Time</a>
                             </div>
@@ -191,6 +245,27 @@
             </div>
         </div>
     </div>
-    <a class="border rounded d-inline scroll-to-top" href="#wrapper"><i class="fas fa-angle-up"></i></a>
 </div>
+
+<!-- Bottom Navigation -->
+<nav class="bottom-nav">
+    <a href="{{ url_for('index') }}" class="bottom-nav-item active">
+        <i class="fas fa-check-circle"></i>
+        <span>Tasks</span>
+    </a>
+    <a href="{{ url_for('chores_list') }}" class="bottom-nav-item">
+        <i class="fas fa-list"></i>
+        <span>Rooms</span>
+    </a>
+    <a href="{{ url_for('leaderboard') }}" class="bottom-nav-item">
+        <i class="fas fa-trophy"></i>
+        <span>Leaderboard</span>
+    </a>
+    {% if current_user.is_authenticated %}
+        <a href="{{ url_for('items_list') }}" class="bottom-nav-item">
+            <i class="fas fa-box"></i>
+            <span>Items</span>
+        </a>
+    {% endif %}
+</nav>
 {% endblock %}
