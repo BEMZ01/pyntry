@@ -29,8 +29,9 @@ def client():
                   'barcode VARCHAR(32), expiry_date INT, expire_type VARCHAR(32), image_url VARCHAR(256), '
                   'tags LIST)')
         c.execute('CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, username VARCHAR(32) UNIQUE, '
-                  'password VARCHAR(128), active BOOLEAN, points INTEGER DEFAULT 0)')
-        c.execute('CREATE TABLE IF NOT EXISTS rooms (id INTEGER PRIMARY KEY, name TEXT NOT NULL)')
+                  'password VARCHAR(128), active BOOLEAN, points INTEGER DEFAULT 0, mascot_points INTEGER DEFAULT 0)')
+        c.execute('CREATE TABLE IF NOT EXISTS rooms (id INTEGER PRIMARY KEY, name TEXT NOT NULL, '
+                  'color VARCHAR(20) DEFAULT "#4A90E2", icon VARCHAR(50) DEFAULT "home")')
         c.execute('CREATE TABLE IF NOT EXISTS chores (id INTEGER PRIMARY KEY, room_id INTEGER NOT NULL, '
                   'name TEXT NOT NULL, description TEXT, repeat_days INTEGER, '
                   'last_completed DATE, next_due DATE, points INTEGER DEFAULT 5, '
@@ -131,7 +132,7 @@ class TestRooms:
         """Test viewing empty rooms list"""
         response = authenticated_client.get('/chores')
         assert response.status_code == 200
-        assert b'No rooms found' in response.data
+        assert b'Ready to get organized' in response.data or b'Create your first room' in response.data
     
     def test_create_room(self, authenticated_client):
         """Test creating a new room"""
