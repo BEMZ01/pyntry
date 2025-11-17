@@ -121,3 +121,7 @@ cython_debug/
 
 # Project specific ignores
 /pyntry.db
+
+# IDE
+.idea/
+
