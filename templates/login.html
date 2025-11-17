@@ -25,9 +25,23 @@ input[type="checkbox"] {
                                         {{ form.csrf_token }}
                                         <div class="mb-3">
                                             {{ form.username(class="form-control form-control-user", placeholder=form.username.name) }}
+                                            {% if form.username.errors %}
+                                                <div class="text-danger small mt-1">
+                                                    {% for error in form.username.errors %}
+                                                        <div>{{ error }}</div>
+                                                    {% endfor %}
+                                                </div>
+                                            {% endif %}
                                         </div>
                                         <div class="mb-3">
                                             {{ form.password(class="form-control form-control-user", placeholder=form.password.name) }}
+                                            {% if form.password.errors %}
+                                                <div class="text-danger small mt-1">
+                                                    {% for error in form.password.errors %}
+                                                        <div>{{ error }}</div>
+                                                    {% endfor %}
+                                                </div>
+                                            {% endif %}
                                         </div>
                                         <div class="mb-3">
                                             <div class="custom-checkbox small">
@@ -46,4 +60,4 @@ input[type="checkbox"] {
             </div>
         </div>
     </div>
-{% endblock %}
+{% endblock %}ys

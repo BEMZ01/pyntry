@@ -1,0 +1,21 @@
+<!-- Bottom Navigation -->
+<nav class="bottom-nav">
+    <a href="{{ url_for('index') }}" class="bottom-nav-item {% if request.endpoint == 'index' %}active{% endif %}">
+        <i class="fas fa-home"></i>
+        <span>Dashboard</span>
+    </a>
+    <a href="{{ url_for('chores_list') }}" class="bottom-nav-item {% if request.endpoint in ['chores_list', 'room_detail', 'add_room', 'add_chore'] %}active{% endif %}">
+        <i class="fas fa-list"></i>
+        <span>Rooms</span>
+    </a>
+    <a href="{{ url_for('leaderboard') }}" class="bottom-nav-item {% if request.endpoint == 'leaderboard' %}active{% endif %}">
+        <i class="fas fa-trophy"></i>
+        <span>Leaderboard</span>
+    </a>
+    {% if current_user.is_authenticated %}
+        <a href="{{ url_for('items_list') }}" class="bottom-nav-item {% if request.endpoint in ['items_list', 'add_item', 'edit'] %}active{% endif %}">
+            <i class="fas fa-box"></i>
+            <span>Items</span>
+        </a>
+    {% endif %}
+</nav>

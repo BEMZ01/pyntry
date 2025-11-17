@@ -137,24 +137,5 @@ if (document.getElementById('templateSelect').value !== '') {
 </script>
 
 <!-- Bottom Navigation -->
-<nav class="bottom-nav">
-    <a href="{{ url_for('index') }}" class="bottom-nav-item">
-        <i class="fas fa-check-circle"></i>
-        <span>Tasks</span>
-    </a>
-    <a href="{{ url_for('chores_list') }}" class="bottom-nav-item active">
-        <i class="fas fa-list"></i>
-        <span>Rooms</span>
-    </a>
-    <a href="{{ url_for('leaderboard') }}" class="bottom-nav-item">
-        <i class="fas fa-trophy"></i>
-        <span>Leaderboard</span>
-    </a>
-    {% if current_user.is_authenticated %}
-        <a href="{{ url_for('items_list') }}" class="bottom-nav-item">
-            <i class="fas fa-box"></i>
-            <span>Items</span>
-        </a>
-    {% endif %}
-</nav>
+{% include '_bottom_nav.html' %}
 {% endblock %}

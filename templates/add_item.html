@@ -137,7 +137,7 @@ function handleBarcodeChange(barcode) {
                 document.getElementById('reactivate-scanner').addEventListener('click', reactivateScanner);
             });
         </script>
-    <div id="wrapper">
+    <div id="wrapper" class="content-with-nav">
         <div class="d-flex flex-column" id="content-wrapper">
             <div id="content">
                 <div class="container-fluid">
@@ -163,12 +163,38 @@ function handleBarcodeChange(barcode) {
                         <div class="card-body">
                             <form method="post" action="{{ url_for('add_item') }}" enctype="multipart/form-data">
                                 {{ form.csrf_token }}
-                                {{ form.barcode.label }} {{ form.barcode(class="form-control", id="barcode") }}
-                                {{ form.name.label }} {{ form.name(class="form-control") }}
-                                {{ form.quantity.label }} {{ form.quantity(class="form-control") }}
-                                {{ form.expire_type.label }} {{ form.expire_type(class="form-control") }}
-                                {{ form.expiry_date.label }} {{ form.expiry_date(class="form-control") }}
-                                <button class="btn btn-primary" type="submit">Submit</button>
+                                <div class="mb-3">
+                                    {{ form.barcode.label(class="form-label") }}
+                                    {{ form.barcode(class="form-control", id="barcode") }}
+                                </div>
+                                <div class="mb-3">
+                                    {{ form.name.label(class="form-label") }}
+                                    {{ form.name(class="form-control") }}
+                                </div>
+                                <div class="mb-3">
+                                    {{ form.quantity.label(class="form-label") }}
+                                    {{ form.quantity(class="form-control") }}
+                                </div>
+                                <div class="mb-3">
+                                    {{ form.expire_type.label(class="form-label d-block") }}
+                                    <div class="btn-group" role="group" aria-label="Type of expiry">
+                                        {% for subfield in form.expire_type %}
+                                            <input type="radio" class="btn-check" name="{{ form.expire_type.name }}"
+                                                   id="{{ subfield.id }}" value="{{ subfield.data }}"
+                                                   {% if subfield.checked %}checked{% endif %} autocomplete="off">
+                                            <label class="btn btn-outline-primary" for="{{ subfield.id }}">
+                                                {{ subfield.label.text }}
+                                            </label>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    {{ form.expiry_date.label(class="form-label") }}
+                                    {{ form.expiry_date(class="form-control") }}
+                                </div>
+                                <button class="btn btn-primary" type="submit">
+                                    <i class="fas fa-plus"></i> Add Item
+                                </button>
                             </form>
                         </div>
                     </div>
@@ -176,4 +202,5 @@ function handleBarcodeChange(barcode) {
             </div>
         </div><a class="border rounded d-inline scroll-to-top" href="#page-top"><i class="fas fa-angle-up"></i></a>
     </div>
+{% include '_bottom_nav.html' %}
 {% endblock %}

@@ -1,6 +1,6 @@
 {% extends "layout.html" %}
 {% block body %}
-<div id="wrapper">
+<div id="wrapper" class="content-with-nav">
     <div class="d-flex flex-column" id="content-wrapper">
         <div id="content">
             <div class="container-fluid">
@@ -84,4 +84,5 @@
     </div>
     <a class="border rounded d-inline scroll-to-top" href="#wrapper"><i class="fas fa-angle-up"></i></a>
 </div>
+{% include '_bottom_nav.html' %}
 {% endblock %}

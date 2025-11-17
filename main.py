@@ -253,10 +253,38 @@ class AddItemForm(FlaskForm):
 
 
 class RoomForm(FlaskForm):
-    name = StringField('Room Name', validators=[InputRequired(), Length(min=1, max=100)])
+    name = StringField('Room Name')
     color = StringField('Color (hex code)', default='#4A90E2')
     icon = StringField('Icon name', default='home')
     use_template = SelectField('Use Template', choices=[('', 'Custom Room')] + [(name, name) for name in ROOM_TEMPLATES.keys()], default='')
+
+    def validate(self, extra_validators=None):
+        # First call parent validation
+        rv = FlaskForm.validate(self, extra_validators)
+
+        # If using a template, validation passes regardless of name
+        if self.use_template.data and self.use_template.data in ROOM_TEMPLATES:
+            return True
+
+        # Otherwise require name for custom room
+        if not self.name.data or not self.name.data.strip():
+            if not hasattr(self.name, 'errors') or self.name.errors is None:
+                self.name.errors = []
+            elif isinstance(self.name.errors, tuple):
+                self.name.errors = list(self.name.errors)
+            self.name.errors.append('Room Name is required for custom rooms.')
+            return False
+
+        # Validate name length for custom rooms
+        if len(self.name.data) > 100:
+            if not hasattr(self.name, 'errors') or self.name.errors is None:
+                self.name.errors = []
+            elif isinstance(self.name.errors, tuple):
+                self.name.errors = list(self.name.errors)
+            self.name.errors.append('Room Name must be less than 100 characters.')
+            return False
+
+        return rv
 
 
 class ChoreForm(FlaskForm):
@@ -749,10 +777,10 @@ def set_security_headers(response):
     # Content Security Policy
     response.headers['Content-Security-Policy'] = (
         "default-src 'self'; "
-        "script-src 'self' 'unsafe-inline'; "
-        "style-src 'self' 'unsafe-inline'; "
+        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; "
         "img-src 'self' data: https:; "
-        "font-src 'self'; "
+        "font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; "
         "connect-src 'self';"
     )
     # Referrer Policy
@@ -835,6 +863,12 @@ def register():
 def logout():
     logout_user()
     return redirect(url_for('index'))
+
+
+@app.route('/favicon.ico')
+def favicon():
+    """Return 204 No Content for favicon requests to avoid 404 errors"""
+    return '', 204
 
 
 @app.route('/add_item', methods=['GET', 'POST'])
@@ -1182,6 +1216,20 @@ def complete_chore(chore_id):
         conn.commit()
     
     flash(f'Chore marked as complete! You earned {points_earned} points!', 'success')
+
+    # Check if there's a redirect parameter or use referer
+    redirect_to = request.form.get('redirect_to')
+    if redirect_to:
+        return redirect(redirect_to)
+
+    # Check the referer header
+    referer = request.referrer
+    if referer and '/' in referer:
+        referer_path = urlparse(referer).path
+        if referer_path == url_for('index'):  # dashboard
+            return redirect(url_for('index'))
+
+    # Default to room detail
     return redirect(url_for('room_detail', room_id=room_id))
 
 

@@ -111,6 +111,7 @@
                                                     {% if current_user.is_authenticated %}
                                                         <form action="{{ url_for('complete_chore', chore_id=chore.id) }}" method="post" class="ms-2">
                                                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                                            <input type="hidden" name="redirect_to" value="{{ url_for('index') }}"/>
                                                             <button type="submit" class="btn btn-chore btn-chore-success btn-sm">
                                                                 <i class="fas fa-check"></i>
                                                             </button>
@@ -247,25 +248,5 @@
     </div>
 </div>
 
-<!-- Bottom Navigation -->
-<nav class="bottom-nav">
-    <a href="{{ url_for('index') }}" class="bottom-nav-item active">
-        <i class="fas fa-check-circle"></i>
-        <span>Tasks</span>
-    </a>
-    <a href="{{ url_for('chores_list') }}" class="bottom-nav-item">
-        <i class="fas fa-list"></i>
-        <span>Rooms</span>
-    </a>
-    <a href="{{ url_for('leaderboard') }}" class="bottom-nav-item">
-        <i class="fas fa-trophy"></i>
-        <span>Leaderboard</span>
-    </a>
-    {% if current_user.is_authenticated %}
-        <a href="{{ url_for('items_list') }}" class="bottom-nav-item">
-            <i class="fas fa-box"></i>
-            <span>Items</span>
-        </a>
-    {% endif %}
-</nav>
+{% include '_bottom_nav.html' %}
 {% endblock %}

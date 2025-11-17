@@ -226,24 +226,20 @@ function sortTable(n) {
     }
 }
 </script>
-    <div id="wrapper">
+    <div id="wrapper" class="content-with-nav">
         <div class="d-flex flex-column" id="content-wrapper">
             <div id="content">
                 <div class="container-fluid">
                     <div class="d-sm-flex justify-content-between align-items-center mb-4">
-                        <h3 class="text-dark mb-0">All Items</h3>
+                        <h3 class="text-dark mb-0">Pantry</h3>
                         {% if current_user.is_authenticated %}
                             <div>
-                                <p class="mb-2 text-center">Logged in as {{ current_user.username }}.</p>
-                                <p class="mb-2 text-center">
-                                    <a href="{{ url_for('index') }}" class="text-blue-500 hover:underline">Dashboard</a> | 
-                                    <a href="{{ url_for('chores_list') }}" class="text-blue-500 hover:underline">Chores</a> | 
-                                    <a href="{{ url_for('logout') }}" class="text-blue-500 hover:underline">Logout</a>
-                                </p>
-                                <p class="mb-2 text-center"><a href="{{ url_for('register') }}" class="text-blue-500 hover:underline">Register a new user</a></p>
+                                <span class="badge bg-primary" style="font-size: 1rem; padding: 8px 16px;">
+                                    {{ current_user.username }}
+                                </span>
                             </div>
                         {% else %}
-                        <p class="mb-2 text-center"><a href="{{ url_for('login') }}" class="text-blue-500 hover:underline">Login</a></p>
+                            <a href="{{ url_for('login') }}" class="btn btn-primary">Login</a>
                         {% endif %}
                     </div>
                     <div class="row">
@@ -304,6 +300,7 @@ function sortTable(n) {
                 </div>
                 {% if c_expired > 0 %}
                 <form action="{{ url_for('delete_expired') }}" method="post" style="margin-top: 10px;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                     <button type="submit" class="btn btn-danger btn-sm" style="background: rgb(187,65,13);">Delete Expired Items</button>
                 </form>
                 {% endif %}
@@ -361,7 +358,7 @@ function sortTable(n) {
                                                     <td>{{ item.quantity }}</td>
                                                     <td>{{ item.name }}</td>
                                                     <td>{{ item.expire_type }} {{ item.expiry_date }}</td>
-                                                    <td style="background: url({{ item.image_url }}) center / contain no-repeat;"></td>
+                                                    <td {% if item.image_url %}style="background: url({{ item.image_url }}) center / contain no-repeat;"{% endif %}></td>
                                                     <td>
                                                         {%  if current_user.is_authenticated %}
                                                         <div class="row">
@@ -400,4 +397,5 @@ function sortTable(n) {
     </div>
   </div>
 </div>
+{% include '_bottom_nav.html' %}
 {% endblock %}
