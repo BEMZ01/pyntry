@@ -110,26 +110,26 @@ body {
 
 .race-track {
     position: relative;
-    height: 60px;
+    height: 80px;
     background: rgba(255, 255, 255, 0.2);
-    border-radius: 30px;
+    border-radius: 40px;
     margin: 16px 0;
-    overflow: hidden;
+    overflow: visible;
 }
 
 .race-participant {
     position: absolute;
-    top: 50%;
-    transform: translateY(-50%);
     transition: left 0.5s ease;
 }
 
 .race-user {
     left: var(--user-progress, 0%);
+    top: 5px;
 }
 
 .race-mascot {
     left: var(--mascot-progress, 0%);
+    top: 40px;
 }
 
 .participant-avatar {
@@ -142,6 +142,7 @@ body {
     justify-content: center;
     font-size: 1.5rem;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    transform: translateX(-50%);
 }
 
 /* Chore List Items */
@@ -202,6 +203,11 @@ body {
     font-weight: 600;
     border: none;
     transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    text-decoration: none;
 }
 
 .btn-chore-primary {
@@ -213,6 +219,7 @@ body {
     background: #3A7BC8;
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(74, 144, 226, 0.3);
+    color: white;
 }
 
 .btn-chore-success {
@@ -224,6 +231,7 @@ body {
     background: #38A169;
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(72, 187, 120, 0.3);
+    color: white;
 }
 
 /* Bottom Navigation */

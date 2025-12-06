@@ -20,8 +20,335 @@ import requests
 from datetime import datetime, timedelta
 from functools import wraps
 from urllib.parse import urlparse, urljoin
+from logging.handlers import RotatingFileHandler
+import logging
+import shutil
 
 load_dotenv()
+
+# ============================================================================
+# SECURITY IMPROVEMENTS - Integrated from security_improvements.py
+# ============================================================================
+
+def validate_environment():
+    """Validate all required environment variables are set and safe"""
+    REQUIRED_ENV_VARS = ['APP_SECRET', 'DB_PATH', 'PRODUCT_API_URL', 'CONTACT_EMAIL']
+
+    for var in REQUIRED_ENV_VARS:
+        value = os.getenv(var)
+        if not value or value == "":
+            raise ValueError(f"Required environment variable {var} not set")
+
+    # Validate APP_SECRET is strong enough
+    secret = os.getenv("APP_SECRET")
+    if len(secret) < 32:
+        raise ValueError("APP_SECRET must be at least 32 characters long")
+
+    # Validate DB_PATH is safe (no path traversal)
+    db_path = os.getenv("DB_PATH")
+    if '..' in db_path or not db_path.endswith('.db'):
+        raise ValueError("Invalid DB_PATH - potential path traversal or invalid extension")
+
+    # Make DB_PATH absolute to prevent manipulation
+    abs_db_path = os.path.abspath(db_path)
+    expected_dir = os.path.abspath(os.path.dirname(__file__))
+    if not abs_db_path.startswith(expected_dir):
+        raise ValueError(f"DB_PATH must be within application directory: {expected_dir}")
+
+    print("✓ Environment validation passed")
+
+
+def secure_database_file():
+    """Set secure permissions on database file (Unix-like systems)"""
+    db_path = os.getenv("DB_PATH")
+
+    if not os.path.exists(db_path):
+        print(f"Warning: Database file {db_path} does not exist yet")
+        return
+
+    try:
+        # Set permissions to 0600 (owner read/write only) on Unix-like systems
+        if os.name != 'nt':  # Not Windows
+            os.chmod(db_path, 0o600)
+            print(f"✓ Database permissions set to 0600: {db_path}")
+        else:
+            # On Windows, use icacls or equivalent
+            print(f"⚠ On Windows: Manually set permissions on {db_path}")
+            print("  Recommended: Remove all users except the application user")
+    except Exception as e:
+        print(f"Warning: Could not set database permissions: {e}")
+
+
+def setup_security_logging(app):
+    """Configure comprehensive security logging"""
+
+    # Create logs directory if it doesn't exist
+    log_dir = 'logs'
+    os.makedirs(log_dir, exist_ok=True)
+
+    # Security events log
+    security_handler = RotatingFileHandler(
+        os.path.join(log_dir, 'security.log'),
+        maxBytes=10 * 1024 * 1024,  # 10MB
+        backupCount=10
+    )
+    security_handler.setLevel(logging.INFO)
+    security_formatter = logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+    security_handler.setFormatter(security_formatter)
+
+    # Application log
+    app_handler = RotatingFileHandler(
+        os.path.join(log_dir, 'app.log'),
+        maxBytes=10 * 1024 * 1024,
+        backupCount=10
+    )
+    app_handler.setLevel(logging.INFO if not app.debug else logging.DEBUG)
+    app_handler.setFormatter(security_formatter)
+
+    # Add handlers to app logger
+    app.logger.addHandler(security_handler)
+    app.logger.addHandler(app_handler)
+    app.logger.setLevel(logging.INFO)
+
+    print("✓ Security logging configured")
+    return app.logger
+
+
+def log_security_event(logger, event_type, details, username=None, ip_address=None):
+    """Log security-related events"""
+    logger.warning(
+        f"SECURITY EVENT: {event_type} | "
+        f"User: {username or 'anonymous'} | "
+        f"IP: {ip_address or 'unknown'} | "
+        f"Details: {details}"
+    )
+
+
+def setup_https_redirect(app):
+    """Force HTTPS in production"""
+    @app.before_request
+    def force_https():
+        if app.config.get('FORCE_HTTPS', False):
+            if not request.is_secure and request.url.startswith('http://'):
+                url = request.url.replace('http://', 'https://', 1)
+                return redirect(url, code=301)
+
+    print("✓ HTTPS redirect configured")
+
+
+def backup_database():
+    """Create a backup of the database"""
+    db_path = os.getenv("DB_PATH")
+
+    if not os.path.exists(db_path):
+        print("Warning: Database file does not exist, cannot backup")
+        return None
+
+    # Create backups directory
+    backup_dir = 'backups'
+    os.makedirs(backup_dir, exist_ok=True)
+
+    # Generate backup filename with timestamp
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    backup_filename = f"pyntry_backup_{timestamp}.db"
+    backup_path = os.path.join(backup_dir, backup_filename)
+
+    # Copy database
+    try:
+        shutil.copy2(db_path, backup_path)
+        print(f"✓ Database backed up to: {backup_path}")
+
+        # Clean up old backups (keep last 30)
+        cleanup_old_backups(backup_dir, keep_count=30)
+
+        return backup_path
+    except Exception as e:
+        print(f"Error backing up database: {e}")
+        return None
+
+
+def cleanup_old_backups(backup_dir, keep_count=30):
+    """Remove old backup files, keeping only the most recent ones"""
+    try:
+        backups = []
+        for filename in os.listdir(backup_dir):
+            if filename.startswith('pyntry_backup_') and filename.endswith('.db'):
+                filepath = os.path.join(backup_dir, filename)
+                backups.append((filepath, os.path.getctime(filepath)))
+
+        # Sort by creation time (newest first)
+        backups.sort(key=lambda x: x[1], reverse=True)
+
+        # Remove old backups
+        for filepath, _ in backups[keep_count:]:
+            os.remove(filepath)
+            print(f"  Removed old backup: {filepath}")
+
+    except Exception as e:
+        print(f"Warning: Could not cleanup old backups: {e}")
+
+
+class AccountLockout:
+    """Track failed login attempts per user account"""
+
+    def __init__(self, max_attempts=5, lockout_duration=900):  # 15 minutes
+        self.max_attempts = max_attempts
+        self.lockout_duration = lockout_duration
+        self.failed_attempts = {}  # username: [(timestamp, ip), ...]
+        self.locked_accounts = {}  # username: lockout_timestamp
+
+    def is_locked(self, username):
+        """Check if account is currently locked"""
+        if username not in self.locked_accounts:
+            return False
+
+        lockout_time = self.locked_accounts[username]
+        if (datetime.now() - lockout_time).total_seconds() > self.lockout_duration:
+            # Lockout expired
+            del self.locked_accounts[username]
+            if username in self.failed_attempts:
+                del self.failed_attempts[username]
+            return False
+
+        return True
+
+    def record_failed_attempt(self, username, ip_address):
+        """Record a failed login attempt"""
+        now = datetime.now()
+
+        if username not in self.failed_attempts:
+            self.failed_attempts[username] = []
+
+        # Clean up old attempts (older than lockout duration)
+        self.failed_attempts[username] = [
+            (ts, ip) for ts, ip in self.failed_attempts[username]
+            if (now - ts).total_seconds() <= self.lockout_duration
+        ]
+
+        # Add new attempt
+        self.failed_attempts[username].append((now, ip_address))
+
+        # Check if should lock account
+        if len(self.failed_attempts[username]) >= self.max_attempts:
+            self.locked_accounts[username] = now
+            return True  # Account is now locked
+
+        return False
+
+    def record_successful_login(self, username):
+        """Clear failed attempts on successful login"""
+        if username in self.failed_attempts:
+            del self.failed_attempts[username]
+        if username in self.locked_accounts:
+            del self.locked_accounts[username]
+
+    def get_remaining_attempts(self, username):
+        """Get number of attempts remaining before lockout"""
+        if username not in self.failed_attempts:
+            return self.max_attempts
+        return self.max_attempts - len(self.failed_attempts[username])
+
+
+def setup_request_limits(app):
+    """Configure request size limits"""
+    app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB
+
+    @app.errorhandler(413)
+    def request_entity_too_large(error):
+        return {'error': 'File too large'}, 413
+
+    print("✓ Request size limits configured (16MB max)")
+
+
+def validate_barcode(barcode):
+    """Validate barcode format more strictly"""
+    barcode_str = str(barcode)
+
+    # Must be numeric
+    if not barcode_str.isdigit():
+        return False
+
+    # Reasonable length (EAN/UPC codes are 8-13 digits, allow up to 20)
+    if len(barcode_str) < 4 or len(barcode_str) > 20:
+        return False
+
+    return True
+
+
+def initialize_security(app):
+    """
+    Initialize all security improvements
+    Call this function after creating your Flask app
+    """
+    print("\n" + "="*60)
+    print("Initializing Security Improvements")
+    print("="*60)
+
+    # 1. Validate environment
+    try:
+        validate_environment()
+    except ValueError as e:
+        print(f"❌ Environment validation failed: {e}")
+        print("Please fix the above issue before starting the application")
+        exit(1)
+
+    # 2. Secure database
+    secure_database_file()
+
+    # 3. Setup logging
+    logger = setup_security_logging(app)
+
+    # 4. Force HTTPS in production
+    if not app.debug:
+        app.config['FORCE_HTTPS'] = True
+        setup_https_redirect(app)
+
+    # 5. Request limits
+    setup_request_limits(app)
+
+    # 6. Additional security headers for production
+    if not app.debug:
+        @app.after_request
+        def add_hsts_header(response):
+            response.headers['Strict-Transport-Security'] = \
+                'max-age=31536000; includeSubDomains; preload'
+            return response
+        print("✓ HSTS header configured")
+
+    # 7. Create account lockout instance
+    account_lockout = AccountLockout()
+    app.config['ACCOUNT_LOCKOUT'] = account_lockout
+    print("✓ Account lockout mechanism initialized")
+
+    print("="*60)
+    print("Security initialization complete!")
+    print("="*60 + "\n")
+
+    return logger, account_lockout
+
+
+def add_health_check(app):
+    """Add a health check endpoint for monitoring"""
+    @app.route('/health')
+    def health_check():
+        """Simple health check endpoint"""
+        db_path = os.getenv("DB_PATH")
+        db_accessible = os.path.exists(db_path) and os.access(db_path, os.R_OK)
+
+        status = {
+            'status': 'healthy' if db_accessible else 'degraded',
+            'timestamp': datetime.now().isoformat(),
+            'database': 'accessible' if db_accessible else 'inaccessible'
+        }
+
+        return status, 200 if db_accessible else 503
+
+# ============================================================================
+# END OF SECURITY IMPROVEMENTS
+# ============================================================================
+
 if os.getenv("APP_SECRET") is None or os.getenv("APP_SECRET") == "":
     print("APP_SECRET not found in .env file. Generating one...")
     with open('.env', 'a') as f:
@@ -44,6 +371,15 @@ app.config['WTF_CSRF_SSL_STRICT'] = os.getenv("FLASK_DEBUG", "False").lower() no
 csrf = CSRFProtect(app)
 login_manager.init_app(app)
 login_manager.login_view = "login"
+
+# Request size limiting
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB
+
+# Initialize security improvements
+logger, account_lockout = initialize_security(app)
+
+# Add health check endpoint
+add_health_check(app)
 
 # Rate limiting storage (in production, use Redis or similar)
 login_attempts = {}
@@ -808,6 +1144,16 @@ def login():
         password = form.password.data
         persist = form.persist.data
 
+        # Check if account is locked
+        if account_lockout.is_locked(username):
+            ip_address = request.environ.get('HTTP_X_FORWARDED_FOR', request.remote_addr)
+            log_security_event(logger, 'LOCKED_ACCOUNT_ATTEMPT',
+                             'Attempt to login to locked account',
+                             username=username,
+                             ip_address=ip_address)
+            flash('Account temporarily locked due to too many failed attempts. Try again in 15 minutes.', 'error')
+            return render_template('login.html', form=form), 403
+
         # Record attempt for rate limiting (skip in testing mode)
         if not app.config.get('TESTING', False):
             ip_address = request.environ.get('HTTP_X_FORWARDED_FOR', request.remote_addr)
@@ -815,19 +1161,45 @@ def login():
 
         try:
             login_user(User(username, password), remember=persist)
+            # Clear failed attempts on successful login
+            account_lockout.record_successful_login(username)
+            session['username'] = username
+            session.permanent = persist
+
+            ip_address = request.environ.get('HTTP_X_FORWARDED_FOR', request.remote_addr)
+            log_security_event(logger, 'SUCCESSFUL_LOGIN',
+                             'User logged in successfully',
+                             username=username,
+                             ip_address=ip_address)
+
+            print(f'{username} logged in successfully.')
+            flash('Logged in successfully.', 'success')
+
+            next_page = request.args.get('next')
+            if next_page and is_safe_url(next_page):
+                return redirect(next_page)
+            return redirect(url_for('index'))
+
         except ValueError as e:
             print(e)
-            flash(str(e), 'error')
-            return redirect(url_for('login'))
-        session['username'] = username
-        session.permanent = persist
-        print(f'{username} logged in successfully.')
-        flash('Logged in successfully.', 'success')
+            # Record failed attempt
+            ip_address = request.environ.get('HTTP_X_FORWARDED_FOR', request.remote_addr)
+            locked = account_lockout.record_failed_attempt(username, ip_address)
 
-        next_page = request.args.get('next')
-        if next_page and is_safe_url(next_page):
-            return redirect(next_page)
-        return redirect(url_for('index'))
+            if locked:
+                log_security_event(logger, 'ACCOUNT_LOCKED',
+                                 f'Account locked after {account_lockout.max_attempts} failed attempts',
+                                 username=username, ip_address=ip_address)
+                flash('Too many failed login attempts. Account locked for 15 minutes.', 'error')
+            else:
+                remaining = account_lockout.get_remaining_attempts(username)
+                log_security_event(logger, 'FAILED_LOGIN',
+                                 f'Failed login attempt. {remaining} attempts remaining',
+                                 username=username, ip_address=ip_address)
+                flash(f'Login failed. {remaining} attempts remaining before account lockout.', 'error')
+
+            return redirect(url_for('login'))
+
     return render_template('login.html', form=form)
 
 
@@ -853,6 +1225,14 @@ def register():
                 del globals()['MASTER_USERNAME']
                 del globals()['MASTER_PASSWORD']
             conn.commit()
+
+        # Log user registration
+        ip_address = request.environ.get('HTTP_X_FORWARDED_FOR', request.remote_addr)
+        log_security_event(logger, 'USER_REGISTERED',
+                         f'New user registered: {username}',
+                         username=current_user.username,
+                         ip_address=ip_address)
+
         flash('User created successfully.', 'success')
         return redirect(url_for('index'))
     return render_template('register.html', form=form)
@@ -861,7 +1241,17 @@ def register():
 @app.route("/logout")
 @login_required
 def logout():
+    username = current_user.username
+    ip_address = request.environ.get('HTTP_X_FORWARDED_FOR', request.remote_addr)
+
     logout_user()
+
+    # Log logout event
+    log_security_event(logger, 'USER_LOGOUT',
+                     f'User logged out',
+                     username=username,
+                     ip_address=ip_address)
+
     return redirect(url_for('index'))
 
 
@@ -914,8 +1304,13 @@ def api_item():
     if not barcode:
         return json.dumps({'error': 'Barcode parameter is required.'}), 400
 
-    # Validate barcode is numeric
-    if not barcode.isdigit():
+    # Use improved barcode validation
+    if not validate_barcode(barcode):
+        ip_address = request.environ.get('HTTP_X_FORWARDED_FOR', request.remote_addr)
+        log_security_event(logger, 'INVALID_BARCODE',
+                         f'Invalid barcode format: {barcode}',
+                         username=current_user.username,
+                         ip_address=ip_address)
         return json.dumps({'error': 'Invalid barcode format.'}), 400
 
     with sql.connect(os.getenv("DB_PATH")) as conn:
@@ -1291,6 +1686,11 @@ def forbidden(e):
     return render_template('error.html', error_code=403, error_message='Forbidden'), 403
 
 
+@app.errorhandler(413)
+def request_entity_too_large(e):
+    return render_template('error.html', error_code=413, error_message='File Too Large (Max 16MB)'), 413
+
+
 @app.errorhandler(404)
 def not_found(e):
     return render_template('error.html', error_code=404, error_message='Page Not Found'), 404
@@ -1319,5 +1719,22 @@ with sql.connect(os.getenv("DB_PATH")) as conn:
         __test_populate_db()
 
 if __name__ == "__main__":
-    app.run(debug=os.getenv("FLASK_DEBUG", "False").lower() in ["true", "1"],
-            host='0.0.0.0' if os.getenv("FLASK_DEBUG", "False").lower() in ["true", "1"] else None)
+    # Backup database on startup (production only)
+    if not os.getenv("FLASK_DEBUG", "False").lower() in ["true", "1"]:
+        print("Creating database backup...")
+        backup_database()
+
+    # Prevent use of Flask dev server in production
+    if os.getenv("FLASK_ENV") == "production":
+        print("=" * 60)
+        print("ERROR: Do not use Flask's built-in server in production!")
+        print("Use a production WSGI server instead:")
+        print("  gunicorn -w 4 -b 127.0.0.1:8000 main:app")
+        print("=" * 60)
+        exit(1)
+
+    # Start application (dev mode only, bind to localhost for security)
+    app.run(
+        debug=os.getenv("FLASK_DEBUG", "False").lower() in ["true", "1"],
+        host='127.0.0.1'  # Bind to localhost only for security
+    )
